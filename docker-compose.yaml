@@ -1,0 +1,7 @@
+version: '3.1'
+
+services:
+  rayanesh-telegram-bot:
+    build: .
+    container_name: rayanesh-telegram_bot
+    restart: always
