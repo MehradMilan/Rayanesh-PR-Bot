@@ -124,7 +124,7 @@ async def folder_selected(update, context):
 
     selected_folder_id = query.data.split('|')[1]
     context.user_data['selected_folder_id'] = selected_folder_id
-    await query.message.reply_text("""
+    await query.edit_message_text("""
 🔸 لطفا آدرس Gmail خود را وارد کنید:
 
 🔹 از این آدرس برای اجازه‌ی دسترسی به سند ساخته‌شده استفاده می‌شود.
@@ -278,7 +278,7 @@ async def ask_anon_text(update, context):
 
     selected_folder_id = query.data.split('|')[1]
     context.user_data['selected_folder_id'] = selected_folder_id
-    await query.message.reply_text("""
+    await query.edit_message_text("""
 🔸لطفا متن ناشناس خود را در قالب یک پیام ارسال کنید.
 🔻 اگر طول متن شما بیش از یک پیام است، می‌توانید آن را در یک بستر عمومی قرارداده و لینک آن را در این‌جا ارسال کنید.
 
@@ -365,7 +365,7 @@ async def ask_anon_edit_code(update, context):
     selected_folder_id = query.data.split('|')[1]
     context.user_data['selected_folder_id'] = selected_folder_id
 
-    await query.message.reply_text("""
+    await query.edit_message_text("""
 🔸 لطفا کد ۶ رقمی متن خود را وارد کنید:
 
 🔹 اگر آن را در اختیار ندارید، می‌توانید با سردبیر در ارتباط باشید.
@@ -538,7 +538,7 @@ async def send_poem(update, context):
         poem_data = response.json()
         fullTitle = poem_data.get('fullTitle')
         body = poem_data.get('plainText')
-        await query.message.reply_text(f"""
+        await query.edit_message_text(f"""
 🔸 {fullTitle}
 
 🔹 شعر:
@@ -567,7 +567,7 @@ async def ask_feedback_text(update, context):
 
     selected_option = query.data.split('|')[1]
     context.user_data['selected_option'] = selected_option
-    await query.message.reply_text("""
+    await query.edit_message_text("""
 🔸 لطفا بازخورد خود را در قالب یک پیام بنویسید:
                                    
 🔹 این بازخورد به‌صورت ناشناس برای اعضای رایانش ارسال خواهد شد.
