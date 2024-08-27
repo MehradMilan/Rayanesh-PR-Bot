@@ -46,7 +46,6 @@ async def get_document_text_part(doc_id, marker):
     marker_index = None
 
     for index, element in enumerate(content):
-        print(str(index) + ' - ' + str(element))
         if 'paragraph' in element:
             for para_element in element.get('paragraph').get('elements', []):
                 text_run = para_element.get('textRun')
@@ -68,7 +67,6 @@ async def edit_document_text(doc_id, new_text):
     marker_index, doc_end_index = await get_document_text_part(doc_id, text_marker)
 
     if marker_index is None:
-        print("Marker not found in the document.")
         return
 
     requests = [
@@ -92,9 +90,8 @@ async def edit_document_text(doc_id, new_text):
 
     try:
         result = docs_service.documents().batchUpdate(documentId=doc_id, body={'requests': requests}).execute()
-        print(f"Document updated: {result}")
     except Exception as e:
-        print(f"Error updating document: {e}")
+        pass
 
 async def finalize_document(doc_id, doc_name):
     drive_service = get_drive_service()
@@ -106,9 +103,14 @@ async def notify_group(doc_name, doc_id):
     group_id = get_config()['TELEGRAM.BOT']['GROUP_ID']
     doc_url = f"https://docs.google.com/document/d/{doc_id}/edit"
     bot = get_application().bot
-    await bot.send_message(chat_id=group_id, text=f"✅یک سند نهایی شد.\n"
-                           f"نام سند: {doc_name}\n"
-                           f"لینک: {doc_url}")
+    await bot.send_message(chat_id=group_id, text=f"""
+🟢 یک سند نهایی شد.
+
+🔹 نام سند: {doc_name}
+
+🔸 لینک سند:
+🔗 {doc_url}
+""")
     
 async def get_document_name_by_id(doc_id):
     drive_service = get_drive_service()

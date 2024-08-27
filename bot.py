@@ -2,11 +2,26 @@ import logging
 from telegram.ext import Application, CommandHandler, ConversationHandler, CallbackQueryHandler, MessageHandler, filters
 from handlers import start, send_text, folder_selected, ask_email, confirm_creation, help_command
 from handlers import start, help_command, send_text, send_text_anon, edit_text_anon, finish_text, ask_anon_text, receive_anon_text, confirm_edit, update_anon_text, confirm_finish
-from handlers import ask_anon_edit_code
+from handlers import ask_anon_edit_code, send_random_poem, ask_feedback_text, receive_feedback_text, send_feedback
+from handlers import select_poet, send_random_poem, send_poem
 from db import init_db
 from init import get_application
 
-ASK_EMAIL, ASK_ANON_TEXT, EDIT_ANON_CODE, EDIT_ANON_TEXT, CONFIRM_FINISH, CONFIRM_CREATION = range(6)
+from constants import (
+    ASK_EMAIL,
+    CONFIRM_CREATION,
+    ASK_ANON_TEXT,
+    EDIT_ANON_CODE,
+    EDIT_ANON_TEXT,
+    CONFIRM_FINISH,
+    FEEDBACK_TEXT,
+    POET_TEXT
+)
+
+async def get_group_chat_id(update, context):
+    chat_id = update.message.chat_id
+    print(chat_id)
+    return ConversationHandler.END
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -21,7 +36,10 @@ def main():
     application.add_handler(CommandHandler('send_text', send_text))
     application.add_handler(CommandHandler('send_text_anon', send_text_anon))
     application.add_handler(CommandHandler('edit_text_anon', edit_text_anon))
-    application.add_handler(CommandHandler('finish_text', finish_text))
+    application.add_handler(CommandHandler('random_poem', send_random_poem))
+    application.add_handler(CommandHandler('select_poet', select_poet))
+    application.add_handler(CommandHandler('feedback', send_feedback))
+    application.add_handler(CommandHandler('get_group_chat_id', get_group_chat_id))
 
     conversation_handler_send = ConversationHandler(
         entry_points=[CallbackQueryHandler(folder_selected, pattern="^send_text\\|")],
@@ -50,9 +68,24 @@ def main():
     )
 
     conversation_handler_finish = ConversationHandler(
-        entry_points=[MessageHandler(filters.TEXT & filters.Regex(r'^\d{6}$'), confirm_finish)],
+        entry_points=[CommandHandler('finish_text', finish_text)],
         states={
-            CONFIRM_FINISH: [MessageHandler(filters.TEXT & ~filters.COMMAND, confirm_finish)]
+            CONFIRM_FINISH: [MessageHandler(filters.TEXT & filters.Regex(r'^\d{6}$') & ~filters.COMMAND, confirm_finish)],
+        },
+        fallbacks=[],
+    )
+
+    conversation_handler_feed = ConversationHandler(
+        entry_points=[CallbackQueryHandler(ask_feedback_text, pattern="^feedback\\|")],
+        states={
+            FEEDBACK_TEXT: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_feedback_text)],
+        },
+        fallbacks=[],
+    )
+
+    conversation_handler_poet = ConversationHandler(
+        entry_points=[CallbackQueryHandler(send_poem, pattern="^poet\\|")],
+        states={
         },
         fallbacks=[],
     )
@@ -61,6 +94,8 @@ def main():
     application.add_handler(conversation_handler_anon)
     application.add_handler(conversation_handler_edit)
     application.add_handler(conversation_handler_finish)
+    application.add_handler(conversation_handler_feed)
+    application.add_handler(conversation_handler_poet)
 
     application.run_polling()
 

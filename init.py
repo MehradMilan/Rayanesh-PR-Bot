@@ -18,5 +18,8 @@ async def post_init(application):
         ('finish_text', 'پایان نگارش متن'),
         ('send_text_anon', 'ارسال متن ناشناس'),
         ('edit_text_anon', 'ویرایش متن ناشناس'),
+        ('random_poem', 'شعر تصادفی'),
+        ('select_poet', 'شعر از شاعر خاص'),
+        ('feedback', 'ارسال بازخورد'),
         ('help', 'راهنمایی'),
     ])
