@@ -26,7 +26,11 @@ SCOPES = https://www.googleapis.com/auth/drive https://www.googleapis.com/auth/d
 [GOOGLE.DRIVE]
 ONGOING_FOLDER_ID = YOUR_FOLDER_ID
 TEMPLATE_DOC_ID = YOUR_TEMPLATE_DOC_ID
+
+[IMDB.API]
+TOKEN = YOUR_IMDB_API_TOKEN
 ```
+__Note__: You should get your IMDB token from `https://collectapi.com`. It has a free subscription plan of `1000` requests per month.
 
 ## Usage
 
