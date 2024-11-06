@@ -822,7 +822,6 @@ async def respond_to_movie_suggestion(update, context):
 🔸 نام: {title}
 🔹 سال: {year}
 🔸 نوع: {type_}
-            )
             """,
             )
             await notify_movie_suggestion(movie_name, movie_data)
@@ -840,6 +839,7 @@ async def notify_movie_suggestion(movie_name, imdb_context):
     bot = get_application().bot
     movie = imdb_context[0]
     await bot.send_photo(
+        chat_id=chat_id,
         photo=movie["Poster"],
         caption=f"""
         #CENAMA
