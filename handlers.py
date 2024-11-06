@@ -825,6 +825,11 @@ async def respond_to_movie_suggestion(update, context):
             """,
             )
             await notify_movie_suggestion(movie_name, movie_data)
+            update.message.reply_text(
+                """
+🔸 فیلم پیشنهادی شما برای تیم CENama ارسال شد.
+"""
+            )
         else:
             await update.message.reply_text(
                 """
