@@ -22,4 +22,5 @@ async def post_init(application):
         ('select_poet', 'شعر از شاعر خاص'),
         ('feedback', 'ارسال بازخورد'),
         ('help', 'راهنمایی'),
+        ('suggest_movie', 'پیشنهاد فیلم'),
     ])
