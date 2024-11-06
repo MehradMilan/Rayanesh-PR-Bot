@@ -21,4 +21,5 @@ POETS_GANJOOR = {
     FEEDBACK_TEXT,
     POET_TEXT,
     SUGGEST_MOVIE,
-) = range(9)
+    IMDB_MOVIE_NOT_FOUND
+) = range(10)
