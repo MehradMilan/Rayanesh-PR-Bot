@@ -33,6 +33,7 @@ from constants import (
     FEEDBACK_TEXT,
     POET_TEXT,
     SUGGEST_MOVIE,
+    IMDB_MOVIE_NOT_FOUND,
 )
 
 logger = logging.getLogger(__name__)
@@ -825,12 +826,13 @@ async def respond_to_movie_suggestion(update, context):
             """,
             )
             await notify_movie_suggestion(movie_name, movie_data)
-            update.message.reply_text(
+            await update.message.reply_text(
                 """
 🔸 فیلم پیشنهادی شما برای تیم CENama ارسال شد.
 """
             )
         else:
+            await notify_movie_suggestion(movie_name, IMDB_MOVIE_NOT_FOUND)
             await update.message.reply_text(
                 """
 فیلم با نام موردنظر در دیتابیس IMDB یافت نشد. نام فیلم مورد نظر شما همچنان به اطلاع تیم برگزار کننده‌ی CENama می‌رسد.
@@ -842,6 +844,18 @@ async def respond_to_movie_suggestion(update, context):
 async def notify_movie_suggestion(movie_name, imdb_context):
     chat_id = get_config()["TELEGRAM.BOT"]["GHALBE_TAPANDEH_ID"]
     bot = get_application().bot
+
+    if imdb_context == IMDB_MOVIE_NOT_FOUND:
+        await bot.send_message(
+            chat_id,
+            f"""
+            #CENAMA
+🔸 فیلمی با نام {movie_name} پیشنهاد داده شد.
+🔹 اما در دیتابیس IMDB یافت نشد.
+    """,
+        )
+        return
+
     movie = imdb_context[0]
     await bot.send_photo(
         chat_id=chat_id,
