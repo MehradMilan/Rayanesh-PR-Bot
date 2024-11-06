@@ -838,7 +838,7 @@ async def respond_to_movie_suggestion(update, context):
 async def notify_movie_suggestion(movie_name, imdb_context):
     chat_id = get_config()["TELEGRAM.BOT"]["GHALBE_TAPANDEH_ID"]
     bot = get_application().bot
-    movie = movie_data[0]
+    movie = imdb_context[0]
     await bot.send_photo(
         photo=movie["Poster"],
         caption=f"""
@@ -846,7 +846,6 @@ async def notify_movie_suggestion(movie_name, imdb_context):
 🔸 نام: {movie["Title"]}
 🔹 سال: {movie["Year"]}
 🔸 نوع: {movie["Type"]}
-            )
             """,
     )
     return
