@@ -1,0 +1,67 @@
+# Bytecode and compiled files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environment
+venv/
+*.env
+
+# Django settings and database
+*.sqlite3
+/db.sqlite3
+/media/
+staticfiles/
+static/
+
+# Logs and debug files
+*.log
+*.pot
+*.py[co]
+*.swp
+*.swo
+*.swn
+.DS_Store
+
+# Docker and dependencies
+*.tar
+*.bak
+*.cache
+*.pid
+*.seed
+*.lock
+!.gitkeep
+
+# Ignore VS Code and JetBrains IDE settings
+.vscode/
+.idea/
+*.iml
+
+# Ignore Python and Django specific files
+migrations/**/000*.py
+migrations/**/__pycache__/
+
+# Ignore environment variables
+.env
+*.pem
+
+# Ignore coverage reports
+htmlcov/
+.coverage
+*.cover
+.cache
+nosetests.xml
+coverage.xml
+*.mo
+*.pot
+*.pyc
+.pytest_cache/
+
+# Ignore Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Ignore Celery and Redis files
+celerybeat-schedule
+celerybeat.pid
+__pycache__/
