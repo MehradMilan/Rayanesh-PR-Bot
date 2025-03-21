@@ -54,8 +54,6 @@ services:
     restart: always
     depends_on:
       - web
-    networks:
-      - app-network
 
   # nginx:
   #   image: nginx:latest
