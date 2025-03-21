@@ -8,8 +8,8 @@ from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
-def start(update: Update, context: CallbackContext) -> None:
-    update.message.reply_text('Welcome to the Rayanesh bot! Please send your email to start.')
+async def start(update: Update, context: CallbackContext) -> None:
+    await update.message.reply_text('Welcome to the Rayanesh bot! Please send your email to start.')
 
 def register_user(update: Update, context: CallbackContext) -> None:
     user = update.message.from_user
