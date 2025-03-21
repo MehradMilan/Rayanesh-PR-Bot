@@ -1,0 +1,43 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+
+      - name: Build and push Docker images
+        working-directory: ./rayanesh_bot
+        run: |
+          docker-compose build
+          docker-compose up -d
+
+      - name: Run migrations and collectstatic
+        working-directory: ./rayanesh_bot
+        run: |
+          docker-compose exec web python manage.py makemigrations
+          docker-compose exec web python manage.py migrate
+          docker-compose exec web python manage.py collectstatic --noinput
+
+      - name: Deploy to remote server
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+          SERVER_IP: ${{ secrets.SERVER_IP }}
+        run: |
+          echo "$SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add -
+          ssh -o StrictHostKeyChecking=no $SERVER_USER@$SERVER_IP <<EOF
+            cd /path/to/your/project
+            docker-compose pull
+            docker-compose up -d --build
+          EOF
