@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - master
-      - dev/django-impl
   workflow_dispatch:
 
 jobs:
