@@ -4,9 +4,9 @@ services:
     container_name: postgres_db
     restart: always
     environment:
-      POSTGRES_DB: rayanesh_db
-      POSTGRES_USER: rayanesh_user
-      POSTGRES_PASSWORD: securepassword
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
@@ -21,7 +21,8 @@ services:
 
   web:
     build: .
-    container_name: django_app
+    container_name: api_app
+    command: gunicorn rayanesh_core.wsgi:application --bind 0.0.0.0:8000
     restart: always
     depends_on:
       - db
@@ -32,6 +33,12 @@ services:
       - "8000:8000"
     volumes:
       - .:/app
+    expose:
+      - "8000"
+    environment:
+      - DEBUG=${DEBUG}
+    networks:
+      - app-network
 
   celery_worker:
     build: .
@@ -43,6 +50,25 @@ services:
       - redis
     env_file:
       - api-core.env
+
+  nginx:
+    image: nginx:latest
+    container_name: nginx
+    volumes:
+      - ./nginx_template.conf:/etc/nginx/nginx.conf
+      - ./nginx/ssl:/etc/nginx/ssl
+      - ./api-core.env:/app/api-core.env
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - web
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
 
 volumes:
   postgres_data:
