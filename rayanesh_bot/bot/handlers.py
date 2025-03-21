@@ -1,13 +1,11 @@
 import logging
 import re
 from telegram import Update
-from telegram.ext import CommandHandler, CallbackContext
+from telegram.ext import CallbackContext
 
 from django.conf import settings
 
 from user.models import TelegramUser
-from document.tasks import create_and_share_document, finalize_document_task
-from document.models import Document
 
 logger = logging.getLogger(__name__)
 

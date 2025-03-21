@@ -1,6 +1,7 @@
 from telegram import Update
 from telegram.ext import Application, CommandHandler
 
+import django
 from django.core.management.base import BaseCommand
 from django.conf import settings
 
@@ -11,6 +12,7 @@ class Command(BaseCommand):
     help = 'Runs the Telegram bot'
 
     def handle(self, *args, **kwargs):
+        django.setup()
         
         application = Application.builder().token(settings.RAYA_BOT_TOKEN).build()
 
