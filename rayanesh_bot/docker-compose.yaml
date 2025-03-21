@@ -55,6 +55,14 @@ services:
     depends_on:
       - web
 
+  raya_bot_polling:
+    build: .
+    container_name: raya_bot_polling
+    command: python manage.py run_rayabot
+    restart: always
+    depends_on:
+      - web
+
   # nginx:
   #   image: nginx:latest
   #   container_name: nginx
