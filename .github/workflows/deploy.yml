@@ -28,19 +28,8 @@ jobs:
           docker compose up --build -d --remove-orphans
           docker compose exec web python manage.py test
 
-  approve_deployment:
-    runs-on: ubuntu-latest
-    needs: build_and_test
-    steps:
-      - name: Wait for manual approval
-        uses: hmarr/auto-approve-action@v3
-        with:
-          github-token: ${{ secrets.DEPLOY_TOKEN }}
-    timeout-minutes: 60
-
   deploy:
     runs-on: ubuntu-latest
-    needs: approve_deployment
     steps:
       - name: Deploy to remote server
         env:
