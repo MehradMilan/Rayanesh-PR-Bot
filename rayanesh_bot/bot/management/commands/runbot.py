@@ -1,5 +1,6 @@
 from django.core.management.base import BaseCommand
-from telegram.ext import Updater, CommandHandler
+from telegram import Update
+from telegram.ext import Application, CommandHandler
 from bot.commands import start, register_user, create_document, finalize_document
 from django.conf import settings
 
@@ -7,13 +8,9 @@ class Command(BaseCommand):
     help = 'Runs the Telegram bot'
 
     def handle(self, *args, **kwargs):
-        updater = Updater(settings.TELEGRAM_BOT_TOKEN)
+        
+        application = Application.builder().token(settings.TELEGRAM_BOT_TOKEN).build()
 
-        dispatcher = updater.dispatcher
-        dispatcher.add_handler(CommandHandler("start", start))
-        dispatcher.add_handler(CommandHandler("register", register_user))
-        dispatcher.add_handler(CommandHandler("create_document", create_document))
-        dispatcher.add_handler(CommandHandler("finalize_document", finalize_document))
+        application.add_handler(CommandHandler("start", start))
 
-        updater.start_polling()
-        updater.idle()
+        application.run_polling(allowed_updates=Update.ALL_TYPES)
