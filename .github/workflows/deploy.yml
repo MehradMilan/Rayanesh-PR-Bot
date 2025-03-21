@@ -16,6 +16,11 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v1
 
+      - name: Create api-core.env file
+        run: |
+            touch api-core.env
+            echo "${{secrets.API_CORE_ENV}}" >> api-core.env
+
       - name: Build and run tests
         working-directory: ./rayanesh_bot
         run: |
