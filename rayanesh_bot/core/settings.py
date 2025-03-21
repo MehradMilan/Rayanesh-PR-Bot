@@ -24,7 +24,7 @@ SECRET_KEY = env("SECRET_KEY")
 
 DEBUG = env.bool("DEBUG", default=False)
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*']
 
 
 # Application definition
@@ -145,4 +145,4 @@ CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TASK_SERIALIZER = "json"
 TELEGRAM_BOT_TOKEN=env("TELEGRAM_BOT_TOKEN")
 
-SERVER_DOMAIN=env("SERVER_DOMAIN")
+DOMAIN=env("DOMAIN")
