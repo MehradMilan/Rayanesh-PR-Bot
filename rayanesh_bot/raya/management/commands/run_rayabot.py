@@ -8,15 +8,17 @@ from django.conf import settings
 from raya.handlers import accept_join
 from reusable.models import Raya_Command
 
+
 class Command(BaseCommand):
-    help = 'Runs the Telegram bot'
+    help = "Runs the Telegram bot"
 
     def handle(self, *args, **kwargs):
         django.setup()
-        
+
         application = Application.builder().token(settings.RAYA_BOT_TOKEN).build()
 
-        application.add_handler(CommandHandler(Raya_Command.ACCEPT_JOIN_GROUP, accept_join))
+        application.add_handler(
+            CommandHandler(Raya_Command.ACCEPT_JOIN_GROUP, accept_join)
+        )
 
         application.run_polling(allowed_updates=Update.ALL_TYPES)
-        
