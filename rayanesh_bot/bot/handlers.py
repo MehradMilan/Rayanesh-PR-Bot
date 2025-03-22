@@ -43,15 +43,11 @@ async def authorize(update: Update, context: CallbackContext) -> int:
         await update.message.reply_text(persian.USER_NOT_EXIST)
         return ConversationHandler.END
 
-    if telegram_user.is_authorized:
-        await update.message.reply_text(persian.USER_AUTH_ALREADY_EXIST)
-        return ConversationHandler.END
-
     await update.message.reply_text(persian.ENTER_NAME)
     return bot.states.AWAITING_NAME
 
 
-async def handle_name(update: Update, context: CallbackContext) -> None:
+async def handle_name(update: Update, context: CallbackContext) -> int:
     user = update.effective_user
     telegram_user = await db_sync_services.get_telegram_user_by_id(user.id)
 
@@ -65,7 +61,7 @@ async def handle_name(update: Update, context: CallbackContext) -> None:
     return bot.states.AWAITING_EMAIL
 
 
-async def handle_email(update: Update, context: CallbackContext) -> None:
+async def handle_email(update: Update, context: CallbackContext) -> int:
     user = update.effective_user
     telegram_user = await db_sync_services.get_telegram_user_by_id(user.id)
 

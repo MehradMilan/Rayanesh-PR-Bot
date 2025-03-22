@@ -25,9 +25,6 @@ class Command(BaseCommand):
         application = Application.builder().token(settings.TELEGRAM_BOT_TOKEN).build()
 
         application.add_handler(CommandHandler(bot.commands.START_COMMAND, start))
-        application.add_handler(
-            CommandHandler(bot.commands.AUTHORIZE_COMMAND, authorize)
-        )
 
         auth_conv_handler = ConversationHandler(
             entry_points=[CommandHandler(bot.commands.AUTHORIZE_COMMAND, authorize)],
