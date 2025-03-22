@@ -8,7 +8,7 @@ from django.utils import timezone
 from user.models import TelegramUser, GroupMembership
 import reusable.db_sync_services as db_sync_services
 import reusable.persian_response as persian
-import reusable.telegram_bot.bot_command
+import reusable.telegram_bots
 
 logger = logging.getLogger(__name__)
 
@@ -73,7 +73,7 @@ async def approve_join_request(update: Update, context: CallbackContext) -> None
 
         telegram_link: str = membership.group.telegram_chat_link
         if telegram_link:
-            bot = reusable.telegram_bot.bot_command.get_telegram_bot()
+            bot = reusable.telegram_bots.get_telegram_bot()
             bot.send_message(
                 chat_id=membership.user.telegram_id,
                 text=f"به گروه خوش اومدی ستون.\n{telegram_link}",

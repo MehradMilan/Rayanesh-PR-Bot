@@ -22,18 +22,6 @@ class TelegramUser(models.Model):
         max_length=15, choices=USER_TYPE_CHOICES, default=INTERNAL_USER
     )
 
-    AWAITING_EMAIL_STATE = "awaiting_email"
-    AWAITING_NAME_STATE = "awaiting_name"
-
-    USER_AUTH_STATE_CHOICES = (
-        (AWAITING_EMAIL_STATE, AWAITING_EMAIL_STATE),
-        (AWAITING_NAME_STATE, AWAITING_NAME_STATE),
-    )
-
-    user_auth_state = models.CharField(
-        max_length=20, choices=USER_AUTH_STATE_CHOICES, default=None, null=True
-    )
-
     def __str__(self):
         return f"{self.username or self.telegram_id}"
 
@@ -50,9 +38,9 @@ class Group(models.Model):
 
     @property
     def join_group_uri(self):
-        import reusable.telegram_bot.bot_command
+        import bot.commands
 
-        return f"{settings.TELEGRAM_BASE_URL}/{settings.TELEGRAM_BOT_USERNAME}?{reusable.telegram_bot.bot_command.START_COMMAND}={reusable.telegram_bot.bot_command.JOIN_GROUP_COMMAND}-{self.id}"
+        return f"{settings.TELEGRAM_BASE_URL}/{settings.TELEGRAM_BOT_USERNAME}?{bot.commands.START_COMMAND}={bot.commands.JOIN_GROUP_COMMAND}-{self.id}"
 
 
 class GroupMembership(models.Model):
