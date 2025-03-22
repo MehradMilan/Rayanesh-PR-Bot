@@ -32,7 +32,7 @@ jobs:
 
       - name: Create api-core.env file
         run: |
-          ssh ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} "cd ${{ secrets.REPO_PATH }} && touch api-core.env && echo ${{secrets.API_CORE_ENV}} >> api-core.env"
+          ssh ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} "cd ${{ secrets.REPO_PATH }} && touch api-core.env && echo ${{secrets.API_CORE_ENV}} > api-core.env"
             
       - name: Build, Migrate, and Run
         run: |

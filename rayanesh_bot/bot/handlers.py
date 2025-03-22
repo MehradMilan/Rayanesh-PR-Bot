@@ -6,7 +6,7 @@ from telegram.ext import CallbackContext
 from django.conf import settings
 
 from user.models import TelegramUser
-import db_sync_services
+import bot.db_sync_services as db_sync_services
 
 logger = logging.getLogger(__name__)
 

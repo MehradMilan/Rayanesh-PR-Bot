@@ -33,7 +33,7 @@ class TelegramUser(models.Model):
     )
 
     user_auth_state = models.CharField(
-        max_length=20, choices=USER_AUTH_STATE_CHOICES, default=None
+        max_length=20, choices=USER_AUTH_STATE_CHOICES, default=None, null=True
     )
 
     def __str__(self):
