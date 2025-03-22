@@ -1,8 +1,6 @@
 from django.db import models
 from django.conf import settings
 
-from reusable.models import Bot_Command
-
 
 class TelegramUser(models.Model):
     telegram_id = models.BigIntegerField(unique=True)
@@ -52,7 +50,9 @@ class Group(models.Model):
 
     @property
     def join_group_uri(self):
-        return f"{settings.TELEGRAM_BASE_URL}/{settings.TELEGRAM_BOT_USERNAME}?{Bot_Command.JOIN_GROUP_COMMAND}:{self.id}"
+        import reusable.telegram_bot.bot_command
+
+        return f"{settings.TELEGRAM_BASE_URL}/{settings.TELEGRAM_BOT_USERNAME}?{reusable.telegram_bot.bot_command.START_COMMAND}={reusable.telegram_bot.bot_command.JOIN_GROUP_COMMAND}-{self.id}"
 
 
 class GroupMembership(models.Model):

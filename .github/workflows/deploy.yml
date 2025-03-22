@@ -29,10 +29,6 @@ jobs:
       - name: Git Pull
         run: |
           ssh ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} "cd ${{ secrets.REPO_PATH }} && git checkout dev/django-impl && git pull origin dev/django-impl"
-
-      - name: Create api-core.env file
-        run: |
-          ssh ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} "cd ${{ secrets.REPO_PATH }} && touch api-core.env && echo ${{secrets.API_CORE_ENV}} > api-core.env"
             
       - name: Build, Migrate, and Run
         run: |

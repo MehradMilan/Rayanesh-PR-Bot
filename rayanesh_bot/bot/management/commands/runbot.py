@@ -6,7 +6,7 @@ from django.core.management.base import BaseCommand
 from django.conf import settings
 
 from bot.handlers import start, join_group, authorize
-from reusable.models import Bot_Command
+import reusable.telegram_bot.bot_command
 
 
 class Command(BaseCommand):
@@ -17,12 +17,18 @@ class Command(BaseCommand):
 
         application = Application.builder().token(settings.TELEGRAM_BOT_TOKEN).build()
 
-        application.add_handler(CommandHandler(Bot_Command.START_COMMAND, start))
         application.add_handler(
-            CommandHandler(Bot_Command.AUTHORIZE_COMMAND, authorize)
+            CommandHandler(reusable.telegram_bot.bot_command.START_COMMAND, start)
         )
         application.add_handler(
-            CommandHandler(Bot_Command.JOIN_GROUP_COMMAND, join_group)
+            CommandHandler(
+                reusable.telegram_bot.bot_command.AUTHORIZE_COMMAND, authorize
+            )
+        )
+        application.add_handler(
+            CommandHandler(
+                reusable.telegram_bot.bot_command.JOIN_GROUP_COMMAND, join_group
+            )
         )
 
         application.run_polling(allowed_updates=Update.ALL_TYPES)
