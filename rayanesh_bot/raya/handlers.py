@@ -62,14 +62,14 @@ async def approve_join_request(update: Update, context: CallbackContext) -> None
     await query.answer()
 
     action, membership_id = query.data.split(":")
-    membership: GroupMembership = db_sync_services.get_group_membership_by_id(
+    membership: GroupMembership = await db_sync_services.get_group_membership_by_id(
         membership_id=membership_id
     )
 
     if action == "approve":
         membership.is_approved = True
         membership.joined_at = timezone.now()
-        db_sync_services.save_group_membership(membership)
+        await db_sync_services.save_group_membership(membership)
 
         telegram_link: str = membership.group.telegram_chat_link
         if telegram_link:

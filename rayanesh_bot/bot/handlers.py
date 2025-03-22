@@ -25,7 +25,7 @@ async def start(update: Update, context: CallbackContext) -> None:
         await update.message.reply_text(persian.START_SUCCESS)
     elif command in bot.commands.DEEPLINK_HANDLERS.keys():
         response: str = await bot.commands.DEEPLINK_HANDLERS[command](
-            telegram_user.id, params[0]
+            user.id, params[0]
         )
         await update.message.reply_text(response)
         return
