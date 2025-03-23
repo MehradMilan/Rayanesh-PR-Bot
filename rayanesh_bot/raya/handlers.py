@@ -54,7 +54,7 @@ async def accept_join(update: Update, context: CallbackContext) -> None:
 
         reply_markup = InlineKeyboardMarkup(keyboard)
         await update.message.reply_text(
-            f"Join request for {user.username or user.name} to group '{group.title}'",
+            f"Join request for {user.name} with username {user.username} to group '{group.title}'",
             reply_markup=reply_markup,
         )
 
@@ -80,18 +80,18 @@ async def approve_join_request(update: Update, context: CallbackContext) -> None
         telegram_link: str = group.telegram_chat_link
         if telegram_link:
             bot = reusable.telegram_bots.get_telegram_bot()
-            bot.send_message(
+            await bot.send_message(
                 chat_id=user.telegram_id,
-                text=f"به گروه خوش اومدی ستون.\n{telegram_link}",
+                text=persian.WELCOME_TO_GROUP.format(telegram_link),
             )
 
         await query.message.reply_text(
-            f"✅ {user.username or user.name} has been approved."
+            f"✅ {user.username or user.name} تایید شد."
         )
 
     elif action == "deny":
         await query.message.reply_text(
-            f"❌ User {user.username or user.name}'s request has been denied."
+            f"❌ {user.username or user.name} رد شد."
         )
 
 
@@ -112,7 +112,7 @@ async def show_group_info(update: Update, context: CallbackContext) -> None:
         f"📅 ساخته‌شده در: {group.created_at.strftime('%Y-%m-%d %H:%M')}\n"
         f"👥 اعضا: {len(members)}\n"
         f"{member_names}\n\n"
-        f"📎 لینک گروه تلگرام:\n{group.join_group_uri}"
+        f"📎 لینک عضویت در گروه:\n{group.join_group_uri}"
     )
 
     await query.message.reply_text(message, parse_mode="HTML")
