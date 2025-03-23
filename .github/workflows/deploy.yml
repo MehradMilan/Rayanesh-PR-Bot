@@ -3,7 +3,8 @@ name: CI/CD Pipeline
 on:
   push:
     branches:
-      - master
+      # - master
+      - dev/django-impl
   workflow_dispatch:
 
 jobs:
@@ -27,11 +28,7 @@ jobs:
 
       - name: Git Pull
         run: |
-          ssh ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} "cd ${{ secrets.REPO_PATH }} && git checkout master && git pull origin master"
-
-      - name: Create api-core.env file
-        run: |
-          ssh ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} "cd ${{ secrets.REPO_PATH }} && touch api-core.env && echo ${{secrets.API_CORE_ENV}} >> api-core.env"
+          ssh ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} "cd ${{ secrets.REPO_PATH }} && git checkout dev/django-impl && git pull origin dev/django-impl"
             
       - name: Build, Migrate, and Run
         run: |

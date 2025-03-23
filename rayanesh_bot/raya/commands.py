@@ -1,0 +1,1 @@
+ACCEPT_JOIN_GROUP_COMMAND = "accept_join"

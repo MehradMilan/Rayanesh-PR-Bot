@@ -50,7 +50,15 @@ services:
   telegram_bot_polling:
     build: .
     container_name: telegram_bot_polling
-    command: python manage.py run_bot
+    command: python manage.py runbot
+    restart: always
+    depends_on:
+      - web
+
+  raya_bot_polling:
+    build: .
+    container_name: raya_bot_polling
+    command: python manage.py run_rayabot
     restart: always
     depends_on:
       - web
