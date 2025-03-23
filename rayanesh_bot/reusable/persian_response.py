@@ -69,3 +69,7 @@ NO_PENDING_JOIN_REQUESTS = """
 CANCEL_CONVERSATION = """
 کنسله.
 """
+
+NO_ACTIVE_GROUP = """
+هیچ گروه فعالی وجود نداره.
+"""

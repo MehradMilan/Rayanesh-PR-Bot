@@ -11,7 +11,12 @@ import django
 from django.core.management.base import BaseCommand
 from django.conf import settings
 
-from raya.handlers import accept_join, approve_join_request
+from raya.handlers import (
+    accept_join,
+    approve_join_request,
+    list_groups,
+    show_group_info,
+)
 import raya.commands
 
 
@@ -31,6 +36,10 @@ class Command(BaseCommand):
         )
         application.add_handler(
             CallbackQueryHandler(approve_join_request, pattern="^deny:")
+        )
+        application.add_handler(CommandHandler("list_groups", list_groups))
+        application.add_handler(
+            CallbackQueryHandler(show_group_info, pattern="^groupinfo:")
         )
 
         application.run_polling(allowed_updates=Update.ALL_TYPES)

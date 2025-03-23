@@ -50,3 +50,32 @@ def save_group_membership(group_membership: GroupMembership) -> None:
 def save_user(user: TelegramUser) -> None:
     user.save()
     return
+
+
+@sync_to_async
+def get_user_in_group_membership(group_membership: GroupMembership) -> TelegramUser:
+    return group_membership.user
+
+
+@sync_to_async
+def get_group_in_group_membership(group_membership: GroupMembership) -> Group:
+    return group_membership.group
+
+
+@sync_to_async
+def get_all_active_groups() -> list[Group]:
+    return list(Group.objects.filter(is_active=True))
+
+
+@sync_to_async
+def get_group_by_id(group_id: int) -> Group:
+    return Group.objects.get(id=group_id)
+
+
+@sync_to_async
+def get_group_members(group: Group) -> list[TelegramUser]:
+    return list(
+        TelegramUser.objects.filter(
+            groupmembership__group=group, groupmembership__is_approved=True
+        ).distinct()
+    )
