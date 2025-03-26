@@ -9,6 +9,8 @@ from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
+_drive_service = None
+
 
 def get_drive_service():
     global _drive_service
