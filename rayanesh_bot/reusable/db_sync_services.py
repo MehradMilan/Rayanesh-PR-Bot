@@ -91,7 +91,11 @@ def get_group_members_count(group: Group) -> int:
 
 @sync_to_async
 def get_or_create_document(
-    google_id: str, link: str, user: TelegramUser, directory_id: str = None, is_directory: bool = False
+    google_id: str,
+    link: str,
+    user: TelegramUser,
+    directory_id: str = None,
+    is_directory: bool = False,
 ) -> typing.Tuple[Document, bool]:
     return Document.objects.get_or_create(
         google_id=google_id,

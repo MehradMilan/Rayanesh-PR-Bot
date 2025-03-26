@@ -157,6 +157,8 @@ async def give_access(update: Update, context: CallbackContext) -> int:
         await update.message.reply_text(persian.USER_HAS_NO_ACCESS)
         return ConversationHandler.END
 
+    context.user_data["owner_user"] = telegram_user
+
     groups = await db_sync_services.get_all_active_groups()
 
     if not groups:
@@ -191,15 +193,16 @@ async def select_group(update: Update, context: CallbackContext) -> int:
 
 async def enter_doc_link(update: Update, context: CallbackContext) -> int:
     link = update.message.text.strip()
-    user = update.effective_user
+    user: TelegramUser = context.user_data["owner_user"]
 
-    google_id = raya.services.extract_google_id(link)
-    # TODO: Handle is_directory here.
-    if not google_id:
+    google_id, is_directory = raya.services.extract_google_id_and_type(link)
+    if google_id is None:
         await update.message.reply_text("Invalid document link. Please try again.")
         return raya.states.ENTER_DOC_LINK
 
-    document, created = await db_sync_services.get_or_create_document(google_id, link, user)
+    document, created = await db_sync_services.get_or_create_document(
+        google_id, link, user, is_directory=is_directory
+    )
 
     context.user_data["document"] = document
 

@@ -21,13 +21,29 @@ def get_drive_service():
     return _drive_service
 
 
-def extract_google_id(link: str) -> str | None:
-    match = re.search(r"/d/([a-zA-Z0-9-_]+)", link)
-    return match.group(1) if match else None
+def extract_google_id_and_type(link: str) -> typing.Tuple[str | None, bool | None]:
+    """
+    Extracts the Google ID and determines whether it's a file or folder.
+    Returns a tuple: (google_id, is_directory)
+    """
+    # Match document-style links
+    doc_match = re.search(r"/d/([a-zA-Z0-9-_]+)", link)
+    if doc_match:
+        return doc_match.group(1), False
+
+    # Match folder-style links
+    folder_match = re.search(r"/folders/([a-zA-Z0-9-_]+)", link)
+    if folder_match:
+        return folder_match.group(1), True
+
+    return None, None
 
 
 def give_document_access_to_user(
-    document_id: str, user_email: typing.List[TelegramUser], access_level: str
+    document_id: str,
+    user_email: typing.List[TelegramUser],
+    access_level: str,
+    is_directory: bool,
 ) -> typing.Tuple[bool, str]:
 
     try:
@@ -38,10 +54,12 @@ def give_document_access_to_user(
         ).execute()
 
     except HttpError as error:
-        logger.error(error)
-        return False, error.error_details
+        logger.error(
+            f"Drive API error for document_id: {document_id} where is_directory:{is_directory}: {error}"
+        )
+        return False, str(error)
     except Exception as e:
-        logger.error(e)
-        return False, e
+        logger.error(f"Unexpected error: {e}")
+        return False, str(e)
 
     return True, None
