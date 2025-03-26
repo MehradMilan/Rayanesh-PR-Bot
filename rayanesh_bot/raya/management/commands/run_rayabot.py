@@ -68,7 +68,7 @@ class Command(BaseCommand):
                 ],
                 raya.states.ACCESS_LEVEL: [
                     CallbackQueryHandler(
-                        set_access_level, pattern="^(view|comment|edit)$"
+                        set_access_level, pattern="^(reader|commenter|writer)$"
                     )
                 ],
             },

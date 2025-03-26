@@ -1,9 +1,9 @@
 from django.db import models
 from user.models import TelegramUser, Group
 
-EDIT_ACCESS_LEVEL = "edit"
-COMMENT_ACCESS_LEVEL = "comment"
-VIEW_ACCESS_LEVEL = "view"
+EDIT_ACCESS_LEVEL = "writer"
+COMMENT_ACCESS_LEVEL = "commenter"
+VIEW_ACCESS_LEVEL = "reader"
 ACCESS_LEVEL_CHOICES = (
     (EDIT_ACCESS_LEVEL, EDIT_ACCESS_LEVEL),
     (COMMENT_ACCESS_LEVEL, COMMENT_ACCESS_LEVEL),
