@@ -250,24 +250,6 @@ async def confirm_doc(update: Update, context: CallbackContext) -> int:
     return await send_access_keyboard(update)
 
 
-async def select_access_level(update: Update, context: CallbackContext) -> int:
-    query = update.callback_query
-    await query.answer()
-
-    keyboard = [
-        [InlineKeyboardButton("View Access", callback_data="view")],
-        [InlineKeyboardButton("Comment Access", callback_data="comment")],
-        [InlineKeyboardButton("Edit Access", callback_data="edit")],
-    ]
-
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    await query.message.reply_text(
-        "Select the access level for the group:", reply_markup=reply_markup
-    )
-
-    return ConversationHandler.END
-
-
 async def set_access_level(update: Update, context: CallbackContext) -> None:
     query = update.callback_query
     await query.answer()

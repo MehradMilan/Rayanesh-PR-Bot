@@ -67,7 +67,7 @@ async def share_document_with_group(
 
 
 @celery.shared_task(name="backup_postgres_database", queue=DB_POSTGRES_BACKUP_QUEUE)
-async def backup_postgres_database():
+def backup_postgres_database():
     """
     Performs a PostgreSQL database backup and sends it to a Telegram bot.
     Uses safe subprocess practices and handles errors cleanly.
@@ -102,7 +102,7 @@ async def backup_postgres_database():
         raya_bot = reusable.telegram_bots.get_raya_bot()
         with open(backup_path, "rb") as backup_file:
             asyncio.run(
-                await raya_bot.send_document(
+                raya_bot.send_document(
                     chat_id=settings.HEALTHCHECK_CHAT_ID,
                     document=backup_file,
                     filename=backup_filename,

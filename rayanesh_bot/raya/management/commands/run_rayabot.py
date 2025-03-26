@@ -18,7 +18,7 @@ from raya.handlers import (
     list_groups,
     show_group_info,
     give_access,
-    select_access_level,
+    set_access_level,
     select_group,
     enter_doc_link,
     confirm_doc,
@@ -68,7 +68,7 @@ class Command(BaseCommand):
                 ],
                 raya.states.ACCESS_LEVEL: [
                     CallbackQueryHandler(
-                        select_access_level, pattern="^(view|comment|edit)$"
+                        set_access_level, pattern="^(view|comment|edit)$"
                     )
                 ],
             },
