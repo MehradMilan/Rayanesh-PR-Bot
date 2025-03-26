@@ -48,7 +48,7 @@ services:
       "-l",
       "info",
       "-Q",
-      "db_backup",
+      "db_postgres_backup",
     ]
     volumes:
       - celery_logs:/app/logs

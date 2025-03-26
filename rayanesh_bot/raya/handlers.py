@@ -191,6 +191,7 @@ async def select_group(update: Update, context: CallbackContext) -> int:
 
 async def enter_doc_link(update: Update, context: CallbackContext) -> int:
     link = update.message.text.strip()
+    user = update.effective_user
 
     google_id = raya.services.extract_google_id(link)
     # TODO: Handle is_directory here.
@@ -198,7 +199,7 @@ async def enter_doc_link(update: Update, context: CallbackContext) -> int:
         await update.message.reply_text("Invalid document link. Please try again.")
         return raya.states.ENTER_DOC_LINK
 
-    document, created = await db_sync_services.get_or_create_document(google_id, link)
+    document, created = await db_sync_services.get_or_create_document(google_id, link, user)
 
     context.user_data["document"] = document
 
