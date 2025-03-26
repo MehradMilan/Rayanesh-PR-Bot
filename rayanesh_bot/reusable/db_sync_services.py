@@ -127,7 +127,6 @@ def get_or_create_document_group_access(
 def get_or_create_document_user_access(
     document: Document, user: TelegramUser, access_level: str
 ) -> DocumentUserAccess:
-    user_access, created = DocumentGroupAccess.objects.get_or_create(
+    return DocumentUserAccess.objects.get_or_create(
         document=document, user=user, defaults={"access_level": access_level}
     )
-    return user_access
