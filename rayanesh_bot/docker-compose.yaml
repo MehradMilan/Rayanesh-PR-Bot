@@ -60,25 +60,25 @@ services:
       - api-core.env
 
   celery_beat:
-  build: .
-  container_name: celery_beat
-  restart: unless-stopped
-  command: [
-    "celery",
-    "-A",
-    "core",
-    "beat",
-    "-l",
-    "info",
-    "--scheduler",
-    "django_celery_beat.schedulers:DatabaseScheduler"
-  ]
-  volumes:
-    - .:/app
-    - beat_data:/app/beat_data
-  depends_on:
-    - db
-    - redis
+    build: .
+    container_name: celery_beat
+    restart: unless-stopped
+    command: [
+      "celery",
+      "-A",
+      "core",
+      "beat",
+      "-l",
+      "info",
+      "--scheduler",
+      "django_celery_beat.schedulers:DatabaseScheduler"
+    ]
+    volumes:
+      - .:/app
+      - beat_data:/app/beat_data
+    depends_on:
+      - db
+      - redis
 
 
   telegram_bot_polling:
