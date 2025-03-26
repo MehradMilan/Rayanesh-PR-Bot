@@ -7,7 +7,12 @@ from django.utils import timezone
 
 import reusable.db_sync_services
 from user.models import TelegramUser, GroupMembership, Group
-from document.models import Document
+from document.models import (
+    Document,
+    VIEW_ACCESS_LEVEL,
+    COMMENT_ACCESS_LEVEL,
+    EDIT_ACCESS_LEVEL,
+)
 import reusable.db_sync_services as db_sync_services
 import reusable.persian_response as persian
 import reusable.telegram_bots
@@ -216,9 +221,9 @@ async def enter_doc_link(update: Update, context: CallbackContext) -> int:
 
 async def send_access_keyboard(update: Update) -> int:
     keyboard = [
-        [InlineKeyboardButton("View Access", callback_data="view")],
-        [InlineKeyboardButton("Comment Access", callback_data="comment")],
-        [InlineKeyboardButton("Edit Access", callback_data="edit")],
+        [InlineKeyboardButton("View Access", callback_data=VIEW_ACCESS_LEVEL)],
+        [InlineKeyboardButton("Comment Access", callback_data=COMMENT_ACCESS_LEVEL)],
+        [InlineKeyboardButton("Edit Access", callback_data=EDIT_ACCESS_LEVEL)],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 

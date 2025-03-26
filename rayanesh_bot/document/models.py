@@ -1,6 +1,15 @@
 from django.db import models
 from user.models import TelegramUser, Group
 
+EDIT_ACCESS_LEVEL = "edit"
+COMMENT_ACCESS_LEVEL = "comment"
+VIEW_ACCESS_LEVEL = "view"
+ACCESS_LEVEL_CHOICES = (
+    (EDIT_ACCESS_LEVEL, EDIT_ACCESS_LEVEL),
+    (COMMENT_ACCESS_LEVEL, COMMENT_ACCESS_LEVEL),
+    (VIEW_ACCESS_LEVEL, VIEW_ACCESS_LEVEL),
+)
+
 
 class Document(models.Model):
     owner_user = models.ForeignKey(
@@ -24,14 +33,6 @@ class DocumentUserAccess(models.Model):
     access_count = models.IntegerField(default=1)
     updated_at = models.DateTimeField(auto_now_add=True)
 
-    EDIT_ACCESS_LEVEL = "edit"
-    COMMENT_ACCESS_LEVEL = "comment"
-    VIEW_ACCESS_LEVEL = "view"
-    ACCESS_LEVEL_CHOICES = (
-        (EDIT_ACCESS_LEVEL, EDIT_ACCESS_LEVEL),
-        (COMMENT_ACCESS_LEVEL, COMMENT_ACCESS_LEVEL),
-        (VIEW_ACCESS_LEVEL, VIEW_ACCESS_LEVEL),
-    )
     access_level = models.CharField(
         max_length=10, choices=ACCESS_LEVEL_CHOICES, default=VIEW_ACCESS_LEVEL
     )
@@ -43,14 +44,6 @@ class DocumentGroupAccess(models.Model):
     updated_at = models.DateTimeField(auto_now_add=True)
     is_active = models.BooleanField(default=True)
 
-    EDIT_ACCESS_LEVEL = "edit"
-    COMMENT_ACCESS_LEVEL = "comment"
-    VIEW_ACCESS_LEVEL = "view"
-    ACCESS_LEVEL_CHOICES = (
-        (EDIT_ACCESS_LEVEL, EDIT_ACCESS_LEVEL),
-        (COMMENT_ACCESS_LEVEL, COMMENT_ACCESS_LEVEL),
-        (VIEW_ACCESS_LEVEL, VIEW_ACCESS_LEVEL),
-    )
     access_level = models.CharField(
         max_length=10, choices=ACCESS_LEVEL_CHOICES, default=VIEW_ACCESS_LEVEL
     )
