@@ -3,7 +3,6 @@ from datetime import datetime
 import os
 import subprocess
 from pathlib import Path
-import asyncio
 
 from django.conf import settings
 import celery
@@ -100,14 +99,12 @@ def backup_postgres_database():
         logger.info(f"Database backup successful: {backup_path}")
 
         raya_bot = reusable.telegram_bots.get_raya_bot()
-        with open(backup_path, "rb") as backup_file:
-            asyncio.run(
-                raya_bot.send_document(
-                    chat_id=settings.HEALTHCHECK_CHAT_ID,
-                    document=backup_file,
-                    filename=backup_filename,
-                )
-            )
+        reusable.telegram_bots.send_document_sync(
+            bot=raya_bot,
+            chat_id=settings.HEALTHCHECK_CHAT_ID,
+            file_path=str(backup_path),
+            filename=backup_filename,
+        )
 
         logger.info(f"Backup sent to Telegram: {settings.HEALTHCHECK_CHAT_ID}")
 

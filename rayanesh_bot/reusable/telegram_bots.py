@@ -1,8 +1,11 @@
 from telegram import Bot
 from django.conf import settings
+import requests
 
 _telegram_bot = None
 _raya_bot = None
+
+_TELEGRAM_API_URL = "https://api.telegram.org/bot{}/{}"
 
 
 def get_telegram_bot():
@@ -17,3 +20,13 @@ def get_raya_bot():
     if _raya_bot is None:
         _raya_bot = Bot(token=settings.RAYA_BOT_TOKEN)
     return _raya_bot
+
+
+def send_document_sync(bot: Bot, chat_id: str | int, file_path: str, filename: str):
+    path = "sendDocument"
+    url = _TELEGRAM_API_URL.format(bot.token, path)
+    with open(file_path, "rb") as file:
+        files = {"document": (filename, file)}
+        data = {"chat_id": chat_id}
+        response = requests.post(url, data=data, files=files)
+        response.raise_for_status()

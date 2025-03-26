@@ -118,10 +118,9 @@ def save_document(document: Document) -> None:
 def get_or_create_document_group_access(
     document: Document, group: Group, access_level: str
 ) -> DocumentGroupAccess:
-    group_access, created = DocumentGroupAccess.objects.get_or_create(
+    return DocumentGroupAccess.objects.get_or_create(
         document=document, group=group, defaults={"access_level": access_level}
     )
-    return group_access
 
 
 @sync_to_async
