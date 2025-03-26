@@ -3,6 +3,7 @@ from datetime import datetime
 import os
 import subprocess
 from pathlib import Path
+from asgiref.sync import sync_to_async
 
 from django.conf import settings
 import celery
@@ -12,7 +13,7 @@ from core.celery import DB_POSTGRES_BACKUP_QUEUE, app as celery_app
 
 import reusable.db_sync_services as db_sync_services
 from user.models import TelegramUser, Group
-from document.models import Document
+from document.models import Document, DocumentGroupAccess
 import raya.services
 import reusable.telegram_bots
 
@@ -63,6 +64,52 @@ async def share_document_with_group(
             access.save()
 
     return (not failed_users, failed_users)
+
+
+async def update_user_access_joined_group(
+    group: Group, user: TelegramUser
+) -> typing.Tuple[bool, typing.Dict[str, str]]:
+    failed_docs: typing.Dict[str, str] = {}
+
+    group_doc_accesses: typing.List[DocumentGroupAccess] = await sync_to_async(
+        lambda: list(DocumentGroupAccess.objects.filter(group=group, is_active=True))
+    )()
+
+    for group_access in group_doc_accesses:
+        document: Document = group_access.document
+        access_level: str = group_access.access_level
+
+        try:
+            user_access, created = (
+                await db_sync_services.get_or_create_document_user_access(
+                    document=document, user=user, access_level=access_level
+                )
+            )
+
+            if created:
+                logger.info(f"Creating new access: {document.google_id} → {user.email}")
+
+                is_ok, error = await raya.services.give_document_access_to_user(
+                    document_id=document.google_id,
+                    user_email=user.email,
+                    access_level=access_level,
+                )
+
+                if not is_ok:
+                    failed_docs[document.google_id] = error
+                    continue
+
+            else:
+                user_access.access_count += 1
+                await sync_to_async(user_access.save)()
+
+        except Exception as e:
+            logger.exception(
+                f"Unexpected error for {document.google_id} → {user.email}"
+            )
+            failed_docs[document.google_id] = str(e)
+
+    return (not failed_docs, failed_docs)
 
 
 @celery.shared_task(name="backup_postgres_database", queue=DB_POSTGRES_BACKUP_QUEUE)

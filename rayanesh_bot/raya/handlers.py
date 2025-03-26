@@ -94,6 +94,16 @@ async def approve_join_request(update: Update, context: CallbackContext) -> None
                 chat_id=user.telegram_id,
                 text=persian.WELCOME_TO_GROUP.format(telegram_link),
             )
+        result, errors = await raya.tasks.update_user_access_joined_group(group, user)
+        if result:
+            await update.message.reply_text(
+                "User access updated for all group documents."
+            )
+        else:
+            await update.message.reply_text(
+                "Some document access updates failed:\n"
+                + "\n".join(f"{doc_id}: {error}" for doc_id, error in errors.items())
+            )
 
         await query.message.reply_text(f"✅ {user.username or user.name} تایید شد.")
 

@@ -29,12 +29,26 @@ import raya.states
 
 
 class Command(BaseCommand):
-    help = "Runs the Telegram bot"
+    help = "Runs the Raya Telegram bot"
+
+    async def post_init(application):
+        await application.bot.set_my_commands(
+            [
+                ("accept_join", "Accept New Joiners"),
+                ("list_groups", "List all active groups"),
+                ("give_access", "Give a document's access to a group."),
+            ]
+        )
 
     def handle(self, *args, **kwargs):
         django.setup()
 
-        application = Application.builder().token(settings.RAYA_BOT_TOKEN).build()
+        application = (
+            Application.builder()
+            .post_init(self.post_init)
+            .token(settings.RAYA_BOT_TOKEN)
+            .build()
+        )
 
         application.add_handler(
             CommandHandler(raya.commands.ACCEPT_JOIN_GROUP_COMMAND, accept_join)
