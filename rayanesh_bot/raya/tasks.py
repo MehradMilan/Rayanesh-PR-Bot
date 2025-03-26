@@ -3,6 +3,7 @@ from datetime import datetime
 import os
 import subprocess
 from pathlib import Path
+import asyncio
 
 from django.conf import settings
 import celery
@@ -22,7 +23,7 @@ logger = get_task_logger(__name__)
 @celery_app.on_after_finalize.connect
 def setup_periodic_tasks(sender: celery.Celery, **_) -> None:
     sender.add_periodic_task(
-        crontab(minute="*/5"),
+        crontab(minute="*/2"),
         backup_postgres_database.s(),
         name="backup_postgres_database",
         queue=DB_POSTGRES_BACKUP_QUEUE,
@@ -66,7 +67,7 @@ async def share_document_with_group(
 
 
 @celery.shared_task(name="backup_postgres_database", queue=DB_POSTGRES_BACKUP_QUEUE)
-def backup_postgres_database():
+async def backup_postgres_database():
     """
     Performs a PostgreSQL database backup and sends it to a Telegram bot.
     Uses safe subprocess practices and handles errors cleanly.
@@ -100,10 +101,12 @@ def backup_postgres_database():
 
         raya_bot = reusable.telegram_bots.get_raya_bot()
         with open(backup_path, "rb") as backup_file:
-            raya_bot.send_document(
-                chat_id=settings.HEALTHCHECK_CHAT_ID,
-                document=backup_file,
-                filename=backup_filename,
+            asyncio.run(
+                await raya_bot.send_document(
+                    chat_id=settings.HEALTHCHECK_CHAT_ID,
+                    document=backup_file,
+                    filename=backup_filename,
+                )
             )
 
         logger.info(f"Backup sent to Telegram: {settings.HEALTHCHECK_CHAT_ID}")

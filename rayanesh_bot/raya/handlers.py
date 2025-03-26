@@ -208,18 +208,35 @@ async def enter_doc_link(update: Update, context: CallbackContext) -> int:
 
     if created:
         await update.message.reply_text(
-            "Document doesn't exist in the system. Please provide the directory ID:"
+            "Document doesn't exist in the system. Please provide the directory link:"
         )
         return raya.states.CONFIRM_DOC
-    else:
-        await update.message.reply_text(
-            f"Document found: {document.link}\nSelect access level:"
-        )
-        return raya.states.SELECT_ACCESS_LEVEL
+    return await send_access_keyboard(update)
+
+
+async def send_access_keyboard(update: Update) -> int:
+    keyboard = [
+        [InlineKeyboardButton("View Access", callback_data="view")],
+        [InlineKeyboardButton("Comment Access", callback_data="comment")],
+        [InlineKeyboardButton("Edit Access", callback_data="edit")],
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    await update.message.reply_text(
+        "Select the access level for the group:", reply_markup=reply_markup
+    )
+
+    return raya.states.ACCESS_LEVEL
 
 
 async def confirm_doc(update: Update, context: CallbackContext) -> int:
-    directory_id = update.message.text.strip()
+    directory_link = update.message.text.strip()
+    directory_id, is_directory = raya.services.extract_google_id_and_type(
+        directory_link
+    )
+    if directory_id is None or not is_directory:
+        await update.message.reply_text("Invalid document link. Please try again.")
+        return raya.states.CONFIRM_DOC
 
     document: Document = context.user_data.get("document")
     if not document:
@@ -230,11 +247,7 @@ async def confirm_doc(update: Update, context: CallbackContext) -> int:
     document.is_finalized = True
     await db_sync_services.save_document(document)
 
-    await update.message.reply_text(
-        f"Document object {document.google_id} has been created in DB."
-    )
-
-    return raya.states.SELECT_ACCESS_LEVEL
+    return await send_access_keyboard(update)
 
 
 async def select_access_level(update: Update, context: CallbackContext) -> int:
@@ -276,9 +289,10 @@ async def set_access_level(update: Update, context: CallbackContext) -> None:
             f"Document has been shared with {group.title} at {access_level} level."
         )
     else:
-        message = f"Failed to give access to {len(failed_users)} users from {len(await reusable.db_sync_services.get_group_members_count(group))} user:\n"
+        member_count = await reusable.db_sync_services.get_group_members_count(group)
+        message = f"Failed to give access to {len(failed_users)} out of {member_count} users:\n"
         for user_email, error in failed_users.items():
-            message += f"+  User: {user_email}\n+  Error: {error}"
+            message += f"• {user_email}: {error}\n"
     await query.message.reply_text(message)
 
     return ConversationHandler.END

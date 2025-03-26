@@ -66,7 +66,7 @@ class Command(BaseCommand):
                 raya.states.CONFIRM_DOC: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, confirm_doc)
                 ],
-                raya.states.SELECT_ACCESS_LEVEL: [
+                raya.states.ACCESS_LEVEL: [
                     CallbackQueryHandler(
                         select_access_level, pattern="^(view|comment|edit)$"
                     )
