@@ -1,20 +1,27 @@
 import re
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
+from google.oauth2.service_account import Credentials
 import typing
 import logging
-from functools import lru_cache
 
 from django.conf import settings
-
-from user.models import TelegramUser
 
 logger = logging.getLogger(__name__)
 
 
-@lru_cache
 def get_drive_service():
-    return build("drive", "v3", credentials=settings.GOOGLE_CREDENTIALS_PATH)
+    global _drive_service
+    if _drive_service is None:
+        creds = Credentials.from_service_account_file(
+            settings.GOOGLE_CREDENTIALS_PATH,
+            scopes=[
+                "https://www.googleapis.com/auth/drive",
+                "https://www.googleapis.com/auth/documents",
+            ],
+        )
+        _drive_service = build("drive", "v3", credentials=creds)
+    return _drive_service
 
 
 def extract_google_id_and_type(link: str) -> typing.Tuple[str | None, bool | None]:
@@ -37,7 +44,7 @@ def extract_google_id_and_type(link: str) -> typing.Tuple[str | None, bool | Non
 
 def give_document_access_to_user(
     document_id: str,
-    user_email: typing.List[TelegramUser],
+    user_email: str,
     access_level: str,
 ) -> typing.Tuple[bool, str]:
 
