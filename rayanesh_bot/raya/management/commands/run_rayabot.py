@@ -53,10 +53,10 @@ class Command(BaseCommand):
         )
 
         give_access_conv_handler = ConversationHandler(
-            entr_points=[
+            entry_points=[
                 CommandHandler(raya.commands.GIVE_ACCESS_COMMAND, give_access)
             ],
-            stats={
+            states={
                 raya.states.SELECT_GROUP: [
                     MessageHandler(filters.Regex(r"^/group_\d+"), select_group)
                 ],
