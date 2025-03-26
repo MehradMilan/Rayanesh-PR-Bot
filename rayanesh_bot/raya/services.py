@@ -3,6 +3,7 @@ from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 import typing
 import logging
+from functools import lru_cache
 
 from django.conf import settings
 
@@ -10,15 +11,10 @@ from user.models import TelegramUser
 
 logger = logging.getLogger(__name__)
 
-_drive_service = None
 
-
+@lru_cache
 def get_drive_service():
-    if _drive_service is None:
-        _drive_service = build(
-            "drive", "v3", credentials=settings.GOOGLE_CREDENTIALS_PATH
-        )
-    return _drive_service
+    return build("drive", "v3", credentials=settings.GOOGLE_CREDENTIALS_PATH)
 
 
 def extract_google_id_and_type(link: str) -> typing.Tuple[str | None, bool | None]:
@@ -43,7 +39,6 @@ def give_document_access_to_user(
     document_id: str,
     user_email: typing.List[TelegramUser],
     access_level: str,
-    is_directory: bool,
 ) -> typing.Tuple[bool, str]:
 
     try:
@@ -54,9 +49,7 @@ def give_document_access_to_user(
         ).execute()
 
     except HttpError as error:
-        logger.error(
-            f"Drive API error for document_id: {document_id} where is_directory:{is_directory}: {error}"
-        )
+        logger.error(f"Drive API error for document_id: {document_id}: {error}")
         return False, str(error)
     except Exception as e:
         logger.error(f"Unexpected error: {e}")
