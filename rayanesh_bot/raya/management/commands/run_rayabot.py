@@ -5,6 +5,7 @@ from telegram.ext import (
     MessageHandler,
     filters,
     CallbackQueryHandler,
+    ConversationHandler,
 )
 
 import django
@@ -16,8 +17,15 @@ from raya.handlers import (
     approve_join_request,
     list_groups,
     show_group_info,
+    give_access,
+    select_access_level,
+    select_group,
+    enter_doc_link,
+    confirm_doc,
+    cancel,
 )
 import raya.commands
+import raya.states
 
 
 class Command(BaseCommand):
@@ -37,9 +45,35 @@ class Command(BaseCommand):
         application.add_handler(
             CallbackQueryHandler(approve_join_request, pattern="^deny:")
         )
-        application.add_handler(CommandHandler("list_groups", list_groups))
+        application.add_handler(
+            CommandHandler(raya.commands.LIST_GROUPS_COMMAND, list_groups)
+        )
         application.add_handler(
             CallbackQueryHandler(show_group_info, pattern="^groupinfo:")
         )
+
+        give_access_conv_handler = ConversationHandler(
+            entr_points=[
+                CommandHandler(raya.commands.GIVE_ACCESS_COMMAND, give_access)
+            ],
+            stats={
+                raya.states.SELECT_GROUP: [
+                    MessageHandler(filters.Regex(r"^/group_\d+"), select_group)
+                ],
+                raya.states.ENTER_DOC_LINK: [
+                    MessageHandler(filters.TEXT & ~filters.COMMAND, enter_doc_link)
+                ],
+                raya.states.CONFIRM_DOC: [
+                    MessageHandler(filters.TEXT & ~filters.COMMAND, confirm_doc)
+                ],
+                raya.states.SELECT_ACCESS_LEVEL: [
+                    CallbackQueryHandler(
+                        select_access_level, pattern="^(view|comment|edit)$"
+                    )
+                ],
+            },
+            fallbacks=[CommandHandler(raya.commands.CANCEL_COMMAND, cancel)],
+        )
+        application.add_handler(give_access_conv_handler)
 
         application.run_polling(allowed_updates=Update.ALL_TYPES)

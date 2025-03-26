@@ -13,3 +13,6 @@ app.autodiscover_tasks()
 @app.task(bind=True)
 def debug_task(self):
     print(f"Request: {self.request!r}")
+
+
+DB_POSTGRES_BACKUP_QUEUE = "db_postgres_backup"

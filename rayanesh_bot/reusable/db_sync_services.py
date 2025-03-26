@@ -3,6 +3,7 @@ import typing
 from telegram import User
 
 from user.models import TelegramUser, Group, GroupMembership
+from document.models import Document, DocumentGroupAccess, DocumentUserAccess
 
 
 @sync_to_async
@@ -79,3 +80,50 @@ def get_group_members(group: Group) -> list[TelegramUser]:
             groupmembership__group=group, groupmembership__is_approved=True
         ).distinct()
     )
+
+
+@sync_to_async
+def get_group_members_count(group: Group) -> int:
+    return TelegramUser.objects.filter(
+        groupmembership__group=group, groupmembership__is_approved=True
+    ).count()
+
+
+@sync_to_async
+def get_or_create_document(
+    google_id: str, link: str, directory_id: str = None, is_directory: bool = False
+) -> typing.Tuple[Document, bool]:
+    return Document.objects.get_or_create(
+        google_id=google_id,
+        defaults={
+            "link": link,
+            "directory_id": directory_id or "",
+            "is_directory": is_directory,
+        },
+    )
+
+
+@sync_to_async
+def save_document(document: Document) -> None:
+    document.save()
+    return
+
+
+@sync_to_async
+def get_or_create_document_group_access(
+    document: Document, group: Group, access_level: str
+) -> DocumentGroupAccess:
+    group_access, created = DocumentGroupAccess.objects.get_or_create(
+        document=document, group=group, defaults={"access_level": access_level}
+    )
+    return group_access
+
+
+@sync_to_async
+def get_or_create_document_user_access(
+    document: Document, user: TelegramUser, access_level: str
+) -> DocumentUserAccess:
+    user_access, created = DocumentGroupAccess.objects.get_or_create(
+        document=document, user=user, defaults={"access_level": access_level}
+    )
+    return user_access

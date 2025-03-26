@@ -1,14 +1,19 @@
 import logging
 from telegram import Update, User, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import CallbackContext
+from telegram.ext import CallbackContext, ConversationHandler
 import typing
 
 from django.utils import timezone
 
+import reusable.db_sync_services
 from user.models import TelegramUser, GroupMembership, Group
+from document.models import Document
 import reusable.db_sync_services as db_sync_services
 import reusable.persian_response as persian
 import reusable.telegram_bots
+import raya.states
+import raya.services
+import raya.tasks
 
 logger = logging.getLogger(__name__)
 
@@ -85,14 +90,10 @@ async def approve_join_request(update: Update, context: CallbackContext) -> None
                 text=persian.WELCOME_TO_GROUP.format(telegram_link),
             )
 
-        await query.message.reply_text(
-            f"✅ {user.username or user.name} تایید شد."
-        )
+        await query.message.reply_text(f"✅ {user.username or user.name} تایید شد.")
 
     elif action == "deny":
-        await query.message.reply_text(
-            f"❌ {user.username or user.name} رد شد."
-        )
+        await query.message.reply_text(f"❌ {user.username or user.name} رد شد.")
 
 
 async def show_group_info(update: Update, context: CallbackContext) -> None:
@@ -143,3 +144,142 @@ async def list_groups(update: Update, context: CallbackContext) -> None:
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text("لیست گروه‌های فعال:\n", reply_markup=reply_markup)
 
+
+async def give_access(update: Update, context: CallbackContext) -> int:
+    user = update.effective_user
+    telegram_user = await db_sync_services.get_telegram_user_by_id(user.id)
+
+    if not telegram_user.is_authorized:
+        await update.message.reply_text(persian.USER_UNAUTHORIZED)
+        return ConversationHandler.END
+
+    if telegram_user.user_type != TelegramUser.MANAGER_USER:
+        await update.message.reply_text(persian.USER_HAS_NO_ACCESS)
+        return ConversationHandler.END
+
+    groups = await db_sync_services.get_all_active_groups()
+
+    if not groups:
+        await update.message.reply_text(persian.NO_ACTIVE_GROUP)
+        return ConversationHandler.END
+
+    message = "Please select a group to give access:\n"
+    for group in groups:
+        message += f"/group_{group.id} - {group.title}\n"
+
+    await update.message.reply_text(message)
+
+    return raya.states.SELECT_GROUP
+
+
+async def select_group(update: Update, context: CallbackContext) -> int:
+    message_text = update.message.text.strip()
+
+    group_id = int(message_text.split("_")[1])
+    group = await db_sync_services.get_group_by_id(group_id)
+
+    if not group:
+        await update.message.reply_text(persian.GROUP_NOT_FOUND)
+        return ConversationHandler.END
+
+    context.user_data["selected_group"] = group
+
+    await update.message.reply_text("Please send the document link to share:")
+
+    return raya.states.ENTER_DOC_LINK
+
+
+async def enter_doc_link(update: Update, context: CallbackContext) -> int:
+    link = update.message.text.strip()
+
+    google_id = raya.services.extract_google_id(link)
+    # TODO: Handle is_directory here.
+    if not google_id:
+        await update.message.reply_text("Invalid document link. Please try again.")
+        return raya.states.ENTER_DOC_LINK
+
+    document, created = await db_sync_services.get_or_create_document(google_id, link)
+
+    context.user_data["document"] = document
+
+    if created:
+        await update.message.reply_text(
+            "Document doesn't exist in the system. Please provide the directory ID:"
+        )
+        return raya.states.CONFIRM_DOC
+    else:
+        await update.message.reply_text(
+            f"Document found: {document.link}\nSelect access level:"
+        )
+        return raya.states.SELECT_ACCESS_LEVEL
+
+
+async def confirm_doc(update: Update, context: CallbackContext) -> int:
+    directory_id = update.message.text.strip()
+
+    document: Document = context.user_data.get("document")
+    if not document:
+        await update.message.reply_text("No document selected. Please try again.")
+        return ConversationHandler.END
+
+    document.directory_id = directory_id
+    document.is_finalized = True
+    await db_sync_services.save_document(document)
+
+    await update.message.reply_text(
+        f"Document object {document.google_id} has been created in DB."
+    )
+
+    return raya.states.SELECT_ACCESS_LEVEL
+
+
+async def select_access_level(update: Update, context: CallbackContext) -> int:
+    query = update.callback_query
+    await query.answer()
+
+    keyboard = [
+        [InlineKeyboardButton("View Access", callback_data="view")],
+        [InlineKeyboardButton("Comment Access", callback_data="comment")],
+        [InlineKeyboardButton("Edit Access", callback_data="edit")],
+    ]
+
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await query.message.reply_text(
+        "Select the access level for the group:", reply_markup=reply_markup
+    )
+
+    return ConversationHandler.END
+
+
+async def set_access_level(update: Update, context: CallbackContext) -> None:
+    query = update.callback_query
+    await query.answer()
+
+    access_level = query.data
+
+    group = context.user_data.get("selected_group")
+    document = context.user_data.get("document")
+
+    if not group or not document:
+        await query.message.reply_text("Something went wrong, please try again.")
+        return
+
+    is_ok, failed_users = await raya.tasks.share_document_with_group(
+        document, group, access_level
+    )
+    if is_ok:
+        await query.message.reply_text(
+            f"Document has been shared with {group.title} at {access_level} level."
+        )
+    else:
+        message = f"Failed to give access to {len(failed_users)} users from {len(await reusable.db_sync_services.get_group_members_count(group))} user:\n"
+        for user_email, error in failed_users.items():
+            message += f"+  User: {user_email}\n+  Error: {error}"
+    await query.message.reply_text(message)
+
+    return ConversationHandler.END
+
+
+async def cancel(update: Update, context: CallbackContext):
+    await update.message.reply_text(persian.CANCEL_CONVERSATION)
+    return ConversationHandler.END

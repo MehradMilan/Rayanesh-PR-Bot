@@ -85,5 +85,5 @@ async def handle_email(update: Update, context: CallbackContext) -> int:
 
 
 async def cancel(update: Update, context: CallbackContext):
-    await update.message.reply_text("Authorization cancelled.")
+    await update.message.reply_text(persian.CANCEL_CONVERSATION)
     return ConversationHandler.END
