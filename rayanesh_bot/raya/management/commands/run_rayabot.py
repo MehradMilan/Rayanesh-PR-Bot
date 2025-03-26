@@ -31,7 +31,7 @@ import raya.states
 class Command(BaseCommand):
     help = "Runs the Raya Telegram bot"
 
-    async def post_init(application):
+    async def post_init(self, application):
         await application.bot.set_my_commands(
             [
                 ("accept_join", "Accept New Joiners"),
