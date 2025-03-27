@@ -17,7 +17,12 @@ import bot.states
 
 
 class Command(BaseCommand):
-    help = "Runs the Telegram bot"
+    help = "Runs the Rayanesh Telegram bot"
+
+    async def post_init(self, application):
+        await application.bot.set_my_commands(
+            [("start", "شروع!"), ("authorize", "احراز هویت"), ("help", "راهنمایی")]
+        )
 
     def handle(self, *args, **kwargs):
         django.setup()

@@ -2,7 +2,7 @@ services:
   db:
     image: postgres:13
     container_name: postgres_db
-    restart: always
+    restart: unless-stopped
     env_file:
       - api-core.env
     volumes:
@@ -13,7 +13,7 @@ services:
   redis:
     image: redis:6.2
     container_name: redis_cache
-    restart: always
+    restart: unless-stopped
     ports:
       - "6379:6379"
 
@@ -21,7 +21,7 @@ services:
     build: .
     container_name: api_app
     command: gunicorn core.wsgi:application --bind 0.0.0.0:8000
-    restart: always
+    restart: unless-stopped
     depends_on:
       - db
       - redis
@@ -39,19 +39,53 @@ services:
   celery_worker:
     build: .
     container_name: celery_worker
-    restart: always
-    command: celery -A core worker --loglevel=info
+    restart: unless-stopped
+    command: [
+      "celery",
+      "-A",
+      "core",
+      "worker",
+      "-l",
+      "info",
+      "-Q",
+      "db_postgres_backup",
+    ]
+    volumes:
+      - celery_logs:/app/logs
+      - db_backups:/app/backups
     depends_on:
       - db
       - redis
     env_file:
       - api-core.env
 
+  celery_beat:
+    build: .
+    container_name: celery_beat
+    restart: unless-stopped
+    command: [
+      "celery",
+      "-A",
+      "core",
+      "beat",
+      "-l",
+      "info",
+      "--scheduler",
+      "django_celery_beat.schedulers:DatabaseScheduler"
+    ]
+    volumes:
+      - .:/app
+      - beat_data:/app/beat_data
+    depends_on:
+      - db
+      - redis
+
+
   telegram_bot_polling:
     build: .
     container_name: telegram_bot_polling
     command: python manage.py runbot
-    restart: always
+    restart: unless-stopped
     depends_on:
       - web
 
@@ -59,7 +93,7 @@ services:
     build: .
     container_name: raya_bot_polling
     command: python manage.py run_rayabot
-    restart: always
+    restart: unless-stopped
     depends_on:
       - web
 
@@ -84,3 +118,6 @@ services:
 
 volumes:
   postgres_data:
+  celery_logs:
+  db_backups:
+  beat_data:

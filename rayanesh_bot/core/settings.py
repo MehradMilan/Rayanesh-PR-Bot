@@ -36,6 +36,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "django_celery_beat",
     "rest_framework",
     "user",
     "document",
@@ -152,3 +153,13 @@ RAYA_BOT_TOKEN = env("RAYA_BOT_TOKEN")
 TELEGRAM_BOT_TOKEN = env("TELEGRAM_BOT_TOKEN")
 TELEGRAM_BASE_URL = env("TELEGRAM_BASE_URL")
 TELEGRAM_BOT_USERNAME = env("TELEGRAM_BOT_USERNAME")
+HEALTHCHECK_CHAT_ID = env("HEALTHCHECK_CHAT_ID")
+
+BACKUP_DIR = env("BACKUP_DIR")
+
+POSTGRES_USER = env("POSTGRES_USER")
+POSTGRES_HOST = env("POSTGRES_HOST")
+POSTGRES_DB = env("POSTGRES_DB")
+POSTGRES_PASSWORD = env("POSTGRES_PASSWORD")
+
+GOOGLE_CREDENTIALS_PATH = env("GOOGLE_CREDENTIALS_PATH")
