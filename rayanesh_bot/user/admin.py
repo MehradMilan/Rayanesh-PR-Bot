@@ -21,7 +21,6 @@ class GroupAdmin(admin.ModelAdmin):
         "title",
         "is_active",
         "created_at",
-        "closed_at",
         "telegram_chat_link",
     )
     search_fields = ("title",)

@@ -22,6 +22,9 @@ from raya.handlers import (
     select_group,
     enter_doc_link,
     confirm_doc,
+    revoke_access_start,
+    revoke_process_link,
+    revoke_select_group,
     cancel,
 )
 import raya.commands
@@ -34,9 +37,17 @@ class Command(BaseCommand):
     async def post_init(self, application):
         await application.bot.set_my_commands(
             [
-                ("accept_join", "Accept New Joiners"),
-                ("list_groups", "List all active groups"),
-                ("give_access", "Give a document's access to a group."),
+                (raya.commands.ACCEPT_JOIN_GROUP_COMMAND, "Accept New Joiners"),
+                (raya.commands.LIST_GROUPS_COMMAND, "List all active groups"),
+                (
+                    raya.commands.GIVE_ACCESS_COMMAND,
+                    "Give a document's access to a group.",
+                ),
+                (
+                    raya.commands.REVOKE_ACCESS_COMMAND,
+                    "Revoke a document's access from a group.",
+                ),
+                (raya.commands.CANCEL_COMMAND, "Cancel a command"),
             ]
         )
 
@@ -89,5 +100,19 @@ class Command(BaseCommand):
             fallbacks=[CommandHandler(raya.commands.CANCEL_COMMAND, cancel)],
         )
         application.add_handler(give_access_conv_handler)
+
+        revoke_access_handler = ConversationHandler(
+            entry_points=[CommandHandler("revoke_access", revoke_access_start)],
+            states={
+                raya.states.SELECT_GROUP: [
+                    MessageHandler(filters.Regex(r"^/group_\d+"), revoke_select_group)
+                ],
+                raya.states.ENTER_DOC_LINK: [
+                    MessageHandler(filters.TEXT & ~filters.COMMAND, revoke_process_link)
+                ],
+            },
+            fallbacks=[CommandHandler("cancel", cancel)],
+        )
+        application.add_handler(revoke_access_handler)
 
         application.run_polling(allowed_updates=Update.ALL_TYPES)

@@ -295,6 +295,75 @@ async def set_access_level(update: Update, context: CallbackContext) -> None:
     return ConversationHandler.END
 
 
+async def revoke_access_start(update: Update, context: CallbackContext) -> int:
+    user = update.effective_user
+    telegram_user = await db_sync_services.get_telegram_user_by_id(user.id)
+
+    if (
+        not telegram_user.is_authorized
+        or telegram_user.user_type != TelegramUser.MANAGER_USER
+    ):
+        await update.message.reply_text(
+            "You are not authorized to perform this action."
+        )
+        return ConversationHandler.END
+
+    groups = await db_sync_services.get_all_active_groups()
+    if not groups:
+        await update.message.reply_text("There are no active groups.")
+        return ConversationHandler.END
+
+    message = "Select the group to revoke access from:\n"
+    for group in groups:
+        message += f"/group_{group.id} - {group.title}\n"
+
+    await update.message.reply_text(message)
+    return raya.states.SELECT_GROUP
+
+
+async def revoke_select_group(update: Update, context: CallbackContext) -> int:
+    text = update.message.text.strip()
+    group_id = int(text.split("_")[1])
+    group = await db_sync_services.get_group_by_id(group_id)
+
+    if not group:
+        await update.message.reply_text("Group not found.")
+        return ConversationHandler.END
+
+    context.user_data["selected_group"] = group
+    await update.message.reply_text(
+        "Please send the document link to revoke access from:"
+    )
+    return raya.states.ENTER_DOC_LINK
+
+
+async def revoke_process_link(update: Update, context: CallbackContext) -> int:
+    link = update.message.text.strip()
+    group = context.user_data.get("selected_group")
+    google_id, link_type = raya.services.extract_google_id_and_type(link)
+
+    if not google_id:
+        await update.message.reply_text("Invalid link. Try again.")
+        return ConversationHandler.END
+
+    result, failed_users = await raya.tasks.revoke_user_access_from_group(
+        group, google_id
+    )
+
+    if result:
+        await update.message.reply_text(
+            "Access successfully revoked from group and all users."
+        )
+    else:
+        message = (
+            f"Access revoked from group, but some user revocations failed:\n"
+            + "\n".join(f"• {email}: {error}" for email, error in failed_users.items())
+        )
+        await update.message.reply_text(message)
+
+    return ConversationHandler.END
+
+
 async def cancel(update: Update, context: CallbackContext):
     await update.message.reply_text(persian.CANCEL_CONVERSATION)
     return ConversationHandler.END
