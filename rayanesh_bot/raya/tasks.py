@@ -12,7 +12,7 @@ from celery.utils.log import get_task_logger
 from core.celery import DB_POSTGRES_BACKUP_QUEUE, app as celery_app
 
 import reusable.db_sync_services as db_sync_services
-from user.models import TelegramUser, Group
+from user.models import TelegramUser, Group, GroupMembership
 from document.models import Document, DocumentGroupAccess, DocumentUserAccess
 import raya.services
 import reusable.telegram_bots
@@ -112,7 +112,7 @@ async def update_user_access_joined_group(
     return (not failed_docs, failed_docs)
 
 
-async def revoke_user_access_from_group(
+async def revoke_access_from_group(
     group: Group, document_id: str
 ) -> typing.Tuple[bool, typing.Dict[str, str]]:
     """
@@ -168,6 +168,36 @@ async def revoke_user_access_from_group(
             failed_users[user.email] = str(e)
 
     return (not failed_users, failed_users)
+
+
+async def remove_user_from_group(
+    user: TelegramUser, group: Group
+) -> typing.Tuple[bool, typing.Dict[str, str]]:
+    membership: GroupMembership = GroupMembership.objects.filter(group=group, user=user)
+    await sync_to_async(membership.delete)()
+
+    group_doc_accesses = await sync_to_async(
+        lambda: DocumentGroupAccess.objects.filter(group=group)
+        .select_related("document")
+        .prefetch_related("document__documentuseraccess_set__user")
+    )()
+    failed_docs = {}
+    for doc_access in group_doc_accesses:
+        document = doc_access.document
+        for user_access in doc_access.document.documentuseraccess_set.all():
+            user_access.access_count -= 1
+            if user_access.access_count <= 0:
+                is_ok, error = await raya.services.revoke_document_access_from_user(
+                    document_id=document.google_id,
+                    user_email=user.email,
+                )
+                if not is_ok:
+                    failed_docs[document.google_id] = error
+                    continue
+                await sync_to_async(user_access.delete)()
+            else:
+                await sync_to_async(user_access.save)()
+    return (not failed_docs, failed_docs)
 
 
 @celery.shared_task(name="backup_postgres_database", queue=DB_POSTGRES_BACKUP_QUEUE)

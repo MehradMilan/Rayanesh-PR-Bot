@@ -346,9 +346,7 @@ async def revoke_process_link(update: Update, context: CallbackContext) -> int:
         await update.message.reply_text("Invalid link. Try again.")
         return ConversationHandler.END
 
-    result, failed_users = await raya.tasks.revoke_user_access_from_group(
-        group, google_id
-    )
+    result, failed_users = await raya.tasks.revoke_access_from_group(group, google_id)
 
     if result:
         await update.message.reply_text(
@@ -361,6 +359,94 @@ async def revoke_process_link(update: Update, context: CallbackContext) -> int:
         )
         await update.message.reply_text(message)
 
+    return ConversationHandler.END
+
+
+async def remove_user_start(update: Update, context: CallbackContext) -> int:
+    user = update.effective_user
+    telegram_user = await db_sync_services.get_telegram_user_by_id(user.id)
+
+    if (
+        not telegram_user.is_authorized
+        or telegram_user.user_type != TelegramUser.MANAGER_USER
+    ):
+        await update.message.reply_text(
+            "You are not authorized to perform this action."
+        )
+        return ConversationHandler.END
+
+    groups = await db_sync_services.get_all_active_groups()
+    if not groups:
+        await update.message.reply_text("There are no active groups.")
+        return ConversationHandler.END
+
+    message = "Select the group to remove a user from:\n"
+    for group in groups:
+        message += f"/group_{group.id} - {group.title}\n"
+
+    await update.message.reply_text(message)
+    return raya.states.SELECT_GROUP
+
+
+async def remove_select_group(update: Update, context: CallbackContext) -> int:
+    text = update.message.text.strip()
+    group_id = int(text.split("_")[1])
+    group = await db_sync_services.get_group_by_id(group_id)
+
+    if not group:
+        await update.message.reply_text("Group not found.")
+        return ConversationHandler.END
+
+    context.user_data["selected_group"] = group
+
+    group_members = await db_sync_services.get_group_members(group)
+    if not group_members:
+        await update.message.reply_text("No members in this group.")
+        return ConversationHandler.END
+
+    message = "Select the user to remove:\n"
+    for member in group_members:
+        message += f"/remove_user_{member.id} - {member.name}\n"
+
+    await update.message.reply_text(message)
+    return raya.states.SELECT_USER
+
+
+async def remove_user(update: Update, context: CallbackContext) -> int:
+    text = update.message.text.strip()
+    user_id = int(text.split("_")[1])
+    group = context.user_data.get("selected_group")
+
+    if not group:
+        await update.message.reply_text("No group selected.")
+        return ConversationHandler.END
+
+    user_to_remove = await db_sync_services.get_telegram_user_by_id(user_id)
+    if not user_to_remove:
+        await update.message.reply_text("User not found.")
+        return ConversationHandler.END
+
+    try:
+        result, failed_docs = raya.tasks.remove_user_from_group(
+            user=user_to_remove, group=group
+        )
+        if result:
+            await update.message.reply_text(
+                f"User {user_to_remove.name} has been removed from {group.title}."
+            )
+        else:
+            message = (
+                f"User access revoked from documents in the group, but some document revocations failed:\n"
+                + "\n".join(
+                    f"• document-{doc_id}: {error}"
+                    for doc_id, error in failed_docs.items()
+                )
+            )
+            await update.message.reply_text(message)
+    except Exception as e:
+        update.message.reply_text(str(e))
+
+    await update.message.reply_text(message)
     return ConversationHandler.END
 
 

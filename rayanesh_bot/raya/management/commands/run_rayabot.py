@@ -25,6 +25,9 @@ from raya.handlers import (
     revoke_access_start,
     revoke_process_link,
     revoke_select_group,
+    remove_user_start,
+    remove_select_group,
+    remove_user,
     cancel,
 )
 import raya.commands
@@ -47,7 +50,9 @@ class Command(BaseCommand):
                     raya.commands.REVOKE_ACCESS_COMMAND,
                     "Revoke a document's access from a group.",
                 ),
-                (raya.commands.CANCEL_COMMAND, "Cancel a command"),
+                (raya.commands.REMOVE_USER_COMMAND, "Remove a user from a group.")(
+                    raya.commands.CANCEL_COMMAND, "Cancel a command"
+                ),
             ]
         )
 
@@ -101,8 +106,10 @@ class Command(BaseCommand):
         )
         application.add_handler(give_access_conv_handler)
 
-        revoke_access_handler = ConversationHandler(
-            entry_points=[CommandHandler("revoke_access", revoke_access_start)],
+        revoke_access_conv_handler = ConversationHandler(
+            entry_points=[
+                CommandHandler(raya.commands.REVOKE_ACCESS_COMMAND, revoke_access_start)
+            ],
             states={
                 raya.states.SELECT_GROUP: [
                     MessageHandler(filters.Regex(r"^/group_\d+"), revoke_select_group)
@@ -111,8 +118,24 @@ class Command(BaseCommand):
                     MessageHandler(filters.TEXT & ~filters.COMMAND, revoke_process_link)
                 ],
             },
-            fallbacks=[CommandHandler("cancel", cancel)],
+            fallbacks=[CommandHandler(raya.commands.CANCEL_COMMAND, cancel)],
         )
-        application.add_handler(revoke_access_handler)
+        application.add_handler(revoke_access_conv_handler)
+
+        remove_user_conv_handler = ConversationHandler(
+            entry_points=[
+                CommandHandler(raya.commands.REMOVE_USER_COMMAND, remove_user_start)
+            ],
+            states={
+                raya.states.SELECT_GROUP: [
+                    MessageHandler(filters.Regex(r"^/group_\d+"), remove_select_group)
+                ],
+                raya.states.SELECT_USER: [
+                    MessageHandler(filters.Regex(r"^/remove_user_\d+"), remove_user)
+                ],
+            },
+            fallbacks=[CommandHandler(raya.commands.CANCEL_COMMAND, cancel)],
+        )
+        application.add_handler(remove_user_conv_handler)
 
         application.run_polling(allowed_updates=Update.ALL_TYPES)
