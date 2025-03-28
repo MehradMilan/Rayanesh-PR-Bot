@@ -2,7 +2,7 @@ from asgiref.sync import sync_to_async
 import typing
 from telegram import User
 
-from user.models import TelegramUser, Group, GroupMembership
+from user.models import TelegramUser, Group, GroupMembership, Task
 from document.models import Document, DocumentGroupAccess, DocumentUserAccess
 
 
@@ -130,3 +130,27 @@ def get_or_create_document_user_access(
     return DocumentUserAccess.objects.get_or_create(
         document=document, user=user, defaults={"access_level": access_level}
     )
+
+
+@sync_to_async
+def get_task_by_id(task_id: str) -> Task:
+    return Task.objects.filter(id=task_id).first()
+
+
+@sync_to_async
+def assigne_user_to_task(user: TelegramUser, task: Task) -> None:
+    task.state = task.TAKEN_STATE
+    task.assignee_user = user
+    task.save()
+    return
+
+
+@sync_to_async
+def get_task_assignee(task: Task) -> TelegramUser | None:
+    return task.assignee_user
+
+
+@sync_to_async
+def mark_task_as_done(task: Task) -> None:
+    task.state = Task.DONE_STATE
+    return

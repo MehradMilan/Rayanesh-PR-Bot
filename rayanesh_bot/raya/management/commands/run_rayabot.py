@@ -50,9 +50,8 @@ class Command(BaseCommand):
                     raya.commands.REVOKE_ACCESS_COMMAND,
                     "Revoke a document's access from a group.",
                 ),
-                (raya.commands.REMOVE_USER_COMMAND, "Remove a user from a group.")(
-                    raya.commands.CANCEL_COMMAND, "Cancel a command"
-                ),
+                (raya.commands.REMOVE_USER_COMMAND, "Remove a user from a group."),
+                (raya.commands.CANCEL_COMMAND, "Cancel a command"),
             ]
         )
 
