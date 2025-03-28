@@ -134,8 +134,10 @@ async def list_tasks(update: Update, context: CallbackContext) -> None:
         return
 
     tasks = await sync_to_async(
-        lambda: Task.objects.filter(
-            scope_group=group, state__in=[Task.INITIAL_STATE, Task.TAKEN_STATE]
+        lambda: list(
+            Task.objects.filter(
+                scope_group=group, state__in=[Task.INITIAL_STATE, Task.TAKEN_STATE]
+            )
         )
     )()
 
@@ -177,10 +179,10 @@ async def task_group_filters(
     if not group:
         return False, persian.GROUP_NOT_FOUND
 
-    task_id = re.match(rf"/{command_str}_(\d+)", message).groups()
+    task_id = re.match(rf"/{command_str}_(\d+)(?:@\w+)?", message).groups()[0]
     task = await sync_to_async(
         lambda: Task.objects.filter(id=task_id, scope_group=group).first()
-    )
+    )()
     if task is None:
         return False, persian.TASK_NOT_FOUND
 

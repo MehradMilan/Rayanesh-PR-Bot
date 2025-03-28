@@ -76,13 +76,13 @@ class Command(BaseCommand):
         )
 
         application.add_handler(
-            MessageHandler(filters.Regex(r"^/details_\d+$"), send_task_details)
+            MessageHandler(filters.Regex(r"^/details_\d+(?:@\w+)?$"), send_task_details)
         )
         application.add_handler(
-            MessageHandler(filters.Regex(r"^/pickup_\d+$"), pick_up_task)
+            MessageHandler(filters.Regex(r"^/pickup_\d+(?:@\w+)?$"), pick_up_task)
         )
         application.add_handler(
-            MessageHandler(filters.Regex(r"^/done_\d+$"), mark_task_as_done)
+            MessageHandler(filters.Regex(r"^/done_\d+(?:@\w+)?$"), mark_task_as_done)
         )
 
         application.run_polling(allowed_updates=Update.ALL_TYPES)
