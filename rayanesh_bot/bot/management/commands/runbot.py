@@ -43,9 +43,8 @@ class Command(BaseCommand):
             [
                 (bot.commands.START_COMMAND, "شروع!"),
                 (bot.commands.AUTHORIZE_COMMAND, "احراز هویت"),
-                (bot.commands.ADD_TASK_COMMAND, "اضافه کردن تسک به گروه")(
-                    bot.commands.HELP_COMMAND, "راهنمایی"
-                ),
+                (bot.commands.ADD_TASK_COMMAND, "اضافه کردن تسک به گروه"),
+                (bot.commands.HELP_COMMAND, "راهنمایی"),
                 (
                     bot.commands.LIST_TASKS_COMMAND,
                     "لیست کردن تمام تسک‌های فعال این گروه",

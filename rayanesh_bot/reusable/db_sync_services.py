@@ -162,4 +162,5 @@ def get_task_assignee(task: Task) -> TelegramUser | None:
 @sync_to_async
 def mark_task_as_done(task: Task) -> None:
     task.state = Task.DONE_STATE
+    task.save()
     return

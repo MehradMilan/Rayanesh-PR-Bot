@@ -8,6 +8,7 @@ import typing
 
 from django.conf import settings
 from django.utils import timezone
+from django.db.models import Case, When, IntegerField, Value
 
 from user.models import TelegramUser, Group, Task
 import reusable.db_sync_services as db_sync_services
@@ -133,11 +134,27 @@ async def list_tasks(update: Update, context: CallbackContext) -> None:
         await update.message.reply_text(persian.GROUP_NOT_FOUND)
         return
 
+    PRIORITY_ORDER = {
+        "very_high": 0,
+        "high": 1,
+        "medium": 2,
+        "low": 3,
+    }
     tasks = await sync_to_async(
         lambda: list(
             Task.objects.filter(
                 scope_group=group, state__in=[Task.INITIAL_STATE, Task.TAKEN_STATE]
             )
+            .annotate(
+                priority_order=Case(
+                    *[
+                        When(priority_level=key, then=Value(val))
+                        for key, val in PRIORITY_ORDER.items()
+                    ],
+                    output_field=IntegerField(),
+                )
+            )
+            .order_by("priority_order", "deadline")
         )
     )()
 
@@ -267,15 +284,17 @@ async def start_add_task(update: Update, context: CallbackContext):
 
 
 async def select_group(update: Update, context: CallbackContext):
+    query = update.callback_query
+    await query.answer()
     try:
-        group_id = int(update.message.text.split("_", 1)[1])
+        group_id = int(query.data.split("_", 1)[1])
         group = await db_sync_services.get_group_by_id(group_id)
     except Exception:
         await update.message.reply_text(persian.GROUP_NOT_FOUND)
         return ConversationHandler.END
 
     context.user_data["group"] = group
-    await update.message.reply_text(persian.ENTER_TITLE)
+    await query.message.reply_text(persian.ENTER_TITLE)
     return bot.states.ENTER_TITLE
 
 
