@@ -236,7 +236,9 @@ async def pick_up_task(update: Update, context: CallbackContext) -> None:
         update.effective_user.id
     )
     await db_sync_services.assigne_user_to_task(user=telegram_user, task=task)
-    await update.message.reply_text(persian.TASK_PICKED_UP.format(title=task.title))
+    await update.message.reply_text(
+        persian.TASK_PICKED_UP.format(title=task.title, name=telegram_user.name)
+    )
 
 
 async def mark_task_as_done(update: Update, context: CallbackContext) -> None:

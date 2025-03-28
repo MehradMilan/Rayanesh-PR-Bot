@@ -117,7 +117,7 @@ class Task(models.Model):
             self.assigned_at = timezone.now()
 
         elif self.state == self.DONE_STATE and not self.done_at:
-            if self.assignee_user:
+            if not self.assignee_user:
                 raise ValueError(
                     "Assigned user should not be provided for a task that is done."
                 )
