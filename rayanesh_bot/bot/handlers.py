@@ -1,6 +1,6 @@
 import logging
 import re
-from telegram import Update, User
+from telegram import Update, User, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import CallbackContext, ConversationHandler
 from datetime import timedelta
 from asgiref.sync import sync_to_async
@@ -198,7 +198,7 @@ async def send_task_details(update: Update, context: CallbackContext) -> None:
     priority_name = persian.PRIORITY_NAMES.get(task.priority_level, "نامشخص")
     deadline = task.deadline if task.deadline else "ندارد"
     task_message = persian.TASK_DETAILS_HEADER.format(
-        tatitle=task.title,
+        title=task.title,
         description=task.description,
         priority_name=priority_name,
         deadline=deadline,
@@ -207,7 +207,7 @@ async def send_task_details(update: Update, context: CallbackContext) -> None:
 
 
 async def pick_up_task(update: Update, context: CallbackContext) -> None:
-    is_ok, response = await task_group_filters(update=update, command_str="details")
+    is_ok, response = await task_group_filters(update=update, command_str="pickup")
     if not is_ok:
         await update.message.reply_text(response)
         return
@@ -223,7 +223,7 @@ async def pick_up_task(update: Update, context: CallbackContext) -> None:
 
 
 async def mark_task_as_done(update: Update, context: CallbackContext) -> None:
-    is_ok, response = await task_group_filters(update=update, command_str="details")
+    is_ok, response = await task_group_filters(update=update, command_str="done")
     if not is_ok:
         await update.message.reply_text(response)
         return
@@ -236,6 +236,114 @@ async def mark_task_as_done(update: Update, context: CallbackContext) -> None:
         return
     await db_sync_services.mark_task_as_done(task=task)
     await update.message.reply_text(persian.TASK_MARKED_DONE.format(title=task.title))
+
+
+async def start_add_task(update: Update, context: CallbackContext):
+    if update.message.chat.type.upper() in ["GROUP", "SUPERGROUP"]:
+        await update.message.reply_text(persian.COME_TO_PV)
+        return ConversationHandler.END
+
+    context.user_data.clear()
+    user = await db_sync_services.get_telegram_user_by_id(
+        telegram_id=update.effective_user.id
+    )
+    context.user_data["user"] = user
+    groups = await db_sync_services.get_user_groups(user)
+
+    if not groups:
+        await update.message.reply_text(persian.NO_ACTIVE_GROUP_MEMBER)
+        return ConversationHandler.END
+
+    keyboard = [
+        [InlineKeyboardButton(group.title, callback_data=f"group_{group.id}")]
+        for group in groups
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    await update.message.reply_text(
+        persian.SELECT_GROUP_HEADER, reply_markup=reply_markup
+    )
+    return bot.states.SELECT_GROUP
+
+
+async def select_group(update: Update, context: CallbackContext):
+    try:
+        group_id = int(update.message.text.split("_", 1)[1])
+        group = await db_sync_services.get_group_by_id(group_id)
+    except Exception:
+        await update.message.reply_text(persian.GROUP_NOT_FOUND)
+        return ConversationHandler.END
+
+    context.user_data["group"] = group
+    await update.message.reply_text(persian.ENTER_TITLE)
+    return bot.states.ENTER_TITLE
+
+
+async def enter_title(update: Update, context: CallbackContext):
+    context.user_data["title"] = update.message.text.strip()
+    await update.message.reply_text(persian.ENTER_DESCRIPTION)
+    return bot.states.ENTER_DESCRIPTION
+
+
+async def enter_description(update: Update, context: CallbackContext):
+    context.user_data["description"] = update.message.text.strip()
+
+    keyboard = [
+        [InlineKeyboardButton(f"{emoji} {label}", callback_data=level)]
+        for level, (label, emoji) in persian.PRIORITY_LEVEL_MAP.items()
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    await update.message.reply_text(persian.SELECT_URGENCY, reply_markup=reply_markup)
+    return bot.states.SELECT_URGENCY
+
+
+async def select_urgency(update: Update, context: CallbackContext):
+    query = update.callback_query
+    await query.answer()
+    level = query.data
+    context.user_data["priority_level"] = level
+
+    if level == Task.VERY_HIGH_PRIORITY:
+        deadline = timezone.now().replace(hour=23, minute=59)
+        if (deadline - timezone.now()).total_seconds() > 6 * 3600:
+            deadline = timezone.now() + timedelta(hours=6)
+        context.user_data["deadline"] = deadline
+        return await save_new_task(query, context)
+
+    await query.message.reply_text(persian.ENTER_DEADLINE_DAYS)
+    return bot.states.ENTER_DEADLINE
+
+
+async def enter_deadline(update: Update, context: CallbackContext):
+    try:
+        days = int(update.message.text.strip())
+        deadline = timezone.now().date() + timedelta(days=days)
+        deadline = timezone.make_aware(
+            timezone.datetime.combine(
+                deadline, timezone.datetime.min.time().replace(hour=23, minute=59)
+            )
+        )
+        context.user_data["deadline"] = deadline
+    except Exception:
+        await update.message.reply_text(persian.INVALID_DEADLINE_INPUT)
+        return bot.states.ENTER_DEADLINE
+
+    return await save_new_task(update, context)
+
+
+async def save_new_task(update_or_query, context: CallbackContext):
+    task = Task(
+        title=context.user_data["title"],
+        description=context.user_data["description"],
+        scope_group=context.user_data["group"],
+        priority_level=context.user_data["priority_level"],
+        deadline=context.user_data["deadline"],
+        owner_user=context.user_data["user"],
+    )
+    await sync_to_async(task.save)()
+    await update_or_query.message.reply_text(persian.TASK_CREATED_SUCCESS)
+    return ConversationHandler.END
 
 
 async def cancel(update: Update, context: CallbackContext) -> int:

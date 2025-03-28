@@ -4,6 +4,7 @@ from telegram.ext import (
     CommandHandler,
     ConversationHandler,
     MessageHandler,
+    CallbackQueryHandler,
     filters,
 )
 
@@ -22,6 +23,13 @@ from bot.handlers import (
     send_task_details,
     pick_up_task,
     mark_task_as_done,
+    select_group,
+    select_urgency,
+    start_add_task,
+    enter_deadline,
+    enter_description,
+    enter_title,
+    help,
 )
 import bot.commands
 import bot.states
@@ -35,8 +43,13 @@ class Command(BaseCommand):
             [
                 (bot.commands.START_COMMAND, "شروع!"),
                 (bot.commands.AUTHORIZE_COMMAND, "احراز هویت"),
-                ("help", "راهنمایی"),
-                ("list_tasks", "لیست کردن تمام تسک‌های فعال این گروه"),
+                (bot.commands.ADD_TASK_COMMAND, "اضافه کردن تسک به گروه")(
+                    bot.commands.HELP_COMMAND, "راهنمایی"
+                ),
+                (
+                    bot.commands.LIST_TASKS_COMMAND,
+                    "لیست کردن تمام تسک‌های فعال این گروه",
+                ),
             ]
         )
 
@@ -84,5 +97,30 @@ class Command(BaseCommand):
         application.add_handler(
             MessageHandler(filters.Regex(r"^/done_\d+(?:@\w+)?$"), mark_task_as_done)
         )
+
+        add_task_conv_handler = ConversationHandler(
+            entry_points=[
+                CommandHandler(bot.commands.ADD_TASK_COMMAND, start_add_task)
+            ],
+            states={
+                bot.states.SELECT_GROUP: [
+                    CallbackQueryHandler(select_group, pattern=r"^group_\d+$")
+                ],
+                bot.states.ENTER_TITLE: [
+                    MessageHandler(filters.TEXT & ~filters.COMMAND, enter_title)
+                ],
+                bot.states.ENTER_DESCRIPTION: [
+                    MessageHandler(filters.TEXT & ~filters.COMMAND, enter_description)
+                ],
+                bot.states.SELECT_URGENCY: [CallbackQueryHandler(select_urgency)],
+                bot.states.ENTER_DEADLINE: [
+                    MessageHandler(filters.TEXT & ~filters.COMMAND, enter_deadline)
+                ],
+            },
+            fallbacks=[CommandHandler(bot.commands.CANCEL_COMMAND, cancel)],
+        )
+        application.add_handler(add_task_conv_handler)
+
+        application.add_handler(CommandHandler(bot.commands.HELP_COMMAND, help))
 
         application.run_polling(allowed_updates=Update.ALL_TYPES)

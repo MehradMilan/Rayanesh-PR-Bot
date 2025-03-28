@@ -83,6 +83,15 @@ def get_group_members(group: Group) -> list[TelegramUser]:
 
 
 @sync_to_async
+def get_user_groups(user):
+    return list(
+        Group.objects.filter(
+            groupmembership__user=user, groupmembership__is_approved=True
+        ).distinct()
+    )
+
+
+@sync_to_async
 def get_group_members_count(group: Group) -> int:
     return TelegramUser.objects.filter(
         groupmembership__group=group, groupmembership__is_approved=True

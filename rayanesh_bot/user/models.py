@@ -103,7 +103,7 @@ class Task(models.Model):
     )
 
     class Meta:
-        unique_together = ("scope_group", "title")
+        unique_together = ("scope_group", "title", "created_at")
         indexes = [
             models.Index(fields=["scope_group"]),
             models.Index(fields=["state"]),
