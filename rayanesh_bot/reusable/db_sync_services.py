@@ -164,3 +164,13 @@ def mark_task_as_done(task: Task) -> None:
     task.state = Task.DONE_STATE
     task.save()
     return
+
+
+@sync_to_async
+def get_document_from_document_user_access(dua: DocumentUserAccess) -> Document:
+    return dua.document
+
+
+@sync_to_async
+def get_document_from_document_group_access(dga: DocumentGroupAccess) -> Document:
+    return dga.document

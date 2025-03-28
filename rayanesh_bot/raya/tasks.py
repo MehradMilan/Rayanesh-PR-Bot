@@ -76,7 +76,9 @@ async def update_user_access_joined_group(
     )()
 
     for group_access in group_doc_accesses:
-        document: Document = group_access.document
+        document: Document = (
+            await db_sync_services.get_document_from_document_group_access(group_access)
+        )
         access_level: str = group_access.access_level
 
         try:
@@ -173,13 +175,17 @@ async def revoke_access_from_group(
 async def remove_user_from_group(
     user: TelegramUser, group: Group
 ) -> typing.Tuple[bool, typing.Dict[str, str]]:
-    membership: GroupMembership = GroupMembership.objects.filter(group=group, user=user)
+    membership: GroupMembership = await sync_to_async(
+        lambda: GroupMembership.objects.filter(group=group, user=user).first()
+    )
     await sync_to_async(membership.delete)()
 
     group_doc_accesses = await sync_to_async(
-        lambda: DocumentGroupAccess.objects.filter(group=group)
-        .select_related("document")
-        .prefetch_related("document__documentuseraccess_set__user")
+        lambda: list(
+            DocumentGroupAccess.objects.filter(group=group)
+            .select_related("document")
+            .prefetch_related("document__documentuseraccess_set__user")
+        )
     )()
     failed_docs = {}
     for doc_access in group_doc_accesses:
