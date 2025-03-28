@@ -392,7 +392,7 @@ async def remove_user_start(update: Update, context: CallbackContext) -> int:
 
 async def remove_select_group(update: Update, context: CallbackContext) -> int:
     text = update.message.text.strip()
-    match = re.match(r"^/(\\w+)_([\\d]+)(?:@[\\w\\d_]+)?$", text)
+    match = re.match(r"^/(\w+)_([\d]+)(?:@[\w\d_]+)?$", text)
     group_id = int(match.group(2))
     group = await db_sync_services.get_group_by_id(group_id)
 
@@ -409,7 +409,7 @@ async def remove_select_group(update: Update, context: CallbackContext) -> int:
 
     message = "Select the user to remove:\n"
     for member in group_members:
-        message += f"/remove_user_{member.id} - {member.name}\n"
+        message += f"/remove_user_{member.telegram_id} - {member.name}\n"
 
     await update.message.reply_text(message)
     return raya.states.SELECT_USER
