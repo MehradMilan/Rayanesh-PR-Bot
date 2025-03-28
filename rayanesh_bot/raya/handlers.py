@@ -431,7 +431,7 @@ async def remove_user(update: Update, context: CallbackContext) -> int:
         return ConversationHandler.END
 
     try:
-        result, failed_docs = raya.tasks.remove_user_from_group(
+        result, failed_docs = await raya.tasks.remove_user_from_group(
             user=user_to_remove, group=group
         )
         if result:
@@ -448,9 +448,8 @@ async def remove_user(update: Update, context: CallbackContext) -> int:
             )
             await update.message.reply_text(message)
     except Exception as e:
-        update.message.reply_text(str(e))
+        await update.message.reply_text(str(e))
 
-    await update.message.reply_text(message)
     return ConversationHandler.END
 
 

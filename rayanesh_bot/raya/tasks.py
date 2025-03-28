@@ -91,7 +91,7 @@ async def update_user_access_joined_group(
             if created:
                 logger.info(f"Creating new access: {document.google_id} → {user.email}")
 
-                is_ok, error = await raya.services.give_document_access_to_user(
+                is_ok, error = raya.services.give_document_access_to_user(
                     document_id=document.google_id,
                     user_email=user.email,
                     access_level=access_level,
@@ -152,7 +152,7 @@ async def revoke_access_from_group(
                 user_access.access_count -= 1
 
                 if user_access.access_count <= 0:
-                    is_ok, error = await raya.services.revoke_document_access_from_user(
+                    is_ok, error = raya.services.revoke_document_access_from_user(
                         document_id=document_id,
                         user_email=user.email,
                     )
@@ -193,7 +193,7 @@ async def remove_user_from_group(
         for user_access in doc_access.document.documentuseraccess_set.all():
             user_access.access_count -= 1
             if user_access.access_count <= 0:
-                is_ok, error = await raya.services.revoke_document_access_from_user(
+                is_ok, error = raya.services.revoke_document_access_from_user(
                     document_id=document.google_id,
                     user_email=user.email,
                 )
