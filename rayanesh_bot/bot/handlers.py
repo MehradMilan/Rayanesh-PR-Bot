@@ -96,7 +96,8 @@ async def send_group_chat_id_to_healthcheck_channel(
     telegram_user = await db_sync_services.get_telegram_user_by_id(user.id)
 
     if (
-        not telegram_user.is_authorized
+        telegram_user is None
+        or not telegram_user.is_authorized
         or telegram_user.user_type != TelegramUser.MANAGER_USER
     ):
         await update.message.reply_text(persian.NO_ACCESS)
@@ -104,13 +105,14 @@ async def send_group_chat_id_to_healthcheck_channel(
 
     chat = update.message.chat
     if chat.type.upper() not in ["GROUP", "SUPERGROUP"]:
+        await update.message.reply_text(persian.NO_GROUP)
         logger.info(f"Invalid request in chat: {chat.title} with id={chat.id}")
         return
 
     try:
         message = f"Group {chat.title} chat ID:\n`{chat.id}`"
         await reusable.telegram_bots.get_raya_bot().send_message(
-            chat_id=settings.HEALTHCHECK_CHAT_ID, text=message
+            chat_id=settings.HEALTHCHECK_CHAT_ID, text=message, parse_mode="MarkdownV2"
         )
         await update.message.reply_text(persian.SEND_CHAT_ID_SUCCESS)
     except Exception as e:
@@ -186,9 +188,10 @@ async def task_group_filters(
 
 
 async def send_task_details(update: Update, context: CallbackContext) -> None:
-    is_ok, response = task_group_filters(update=update, command_str="details")
+    is_ok, response = await task_group_filters(update=update, command_str="details")
     if not is_ok:
         await update.message.reply_text(response)
+        return
     task: Task = response
     priority_name = persian.PRIORITY_NAMES.get(task.priority_level, "نامشخص")
     deadline = task.deadline if task.deadline else "ندارد"
@@ -202,9 +205,10 @@ async def send_task_details(update: Update, context: CallbackContext) -> None:
 
 
 async def pick_up_task(update: Update, context: CallbackContext) -> None:
-    is_ok, response = task_group_filters(update=update, command_str="details")
+    is_ok, response = await task_group_filters(update=update, command_str="details")
     if not is_ok:
         await update.message.reply_text(response)
+        return
     task: Task = response
     if await db_sync_services.get_task_assignee(task=task):
         await update.message.reply_text(persian.TASK_ALREADY_TAKEN)
@@ -217,9 +221,10 @@ async def pick_up_task(update: Update, context: CallbackContext) -> None:
 
 
 async def mark_task_as_done(update: Update, context: CallbackContext) -> None:
-    is_ok, response = task_group_filters(update=update, command_str="details")
+    is_ok, response = await task_group_filters(update=update, command_str="details")
     if not is_ok:
         await update.message.reply_text(response)
+        return
     task: Task = response
     telegram_user: TelegramUser = await db_sync_services.get_telegram_user_by_id(
         update.effective_user.id
@@ -231,6 +236,11 @@ async def mark_task_as_done(update: Update, context: CallbackContext) -> None:
     await update.message.reply_text(persian.TASK_MARKED_DONE.format(title=task.title))
 
 
-async def cancel(update: Update, context: CallbackContext):
+async def cancel(update: Update, context: CallbackContext) -> int:
     await update.message.reply_text(persian.CANCEL_CONVERSATION)
     return ConversationHandler.END
+
+
+async def help(update: Update, context: CallbackContext) -> None:
+    await update.message.reply_text(persian.HELP_SUCCESS)
+    return

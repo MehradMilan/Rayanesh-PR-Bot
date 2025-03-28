@@ -32,13 +32,23 @@ class Command(BaseCommand):
 
     async def post_init(self, application):
         await application.bot.set_my_commands(
-            [("start", "شروع!"), ("authorize", "احراز هویت"), ("help", "راهنمایی")]
+            [
+                (bot.commands.START_COMMAND, "شروع!"),
+                (bot.commands.AUTHORIZE_COMMAND, "احراز هویت"),
+                ("help", "راهنمایی"),
+                ("list_tasks", "لیست کردن تمام تسک‌های فعال این گروه"),
+            ]
         )
 
     def handle(self, *args, **kwargs):
         django.setup()
 
-        application = Application.builder().token(settings.TELEGRAM_BOT_TOKEN).build()
+        application = (
+            Application.builder()
+            .post_init(self.post_init)
+            .token(settings.TELEGRAM_BOT_TOKEN)
+            .build()
+        )
 
         application.add_handler(CommandHandler(bot.commands.START_COMMAND, start))
 
@@ -66,13 +76,13 @@ class Command(BaseCommand):
         )
 
         application.add_handler(
-            MessageHandler(filters.regex(r"^/details_\d+$"), send_task_details)
+            MessageHandler(filters.Regex(r"^/details_\d+$"), send_task_details)
         )
         application.add_handler(
-            MessageHandler(filters.regex(r"^/pickup_\d+$"), pick_up_task)
+            MessageHandler(filters.Regex(r"^/pickup_\d+$"), pick_up_task)
         )
         application.add_handler(
-            MessageHandler(filters.regex(r"^/done_\d+$"), mark_task_as_done)
+            MessageHandler(filters.Regex(r"^/done_\d+$"), mark_task_as_done)
         )
 
         application.run_polling(allowed_updates=Update.ALL_TYPES)
