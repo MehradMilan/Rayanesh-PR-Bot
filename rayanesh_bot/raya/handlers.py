@@ -2,6 +2,7 @@ import logging
 from telegram import Update, User, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import CallbackContext, ConversationHandler
 import typing
+import re
 
 from django.utils import timezone
 
@@ -96,11 +97,11 @@ async def approve_join_request(update: Update, context: CallbackContext) -> None
             )
         result, errors = await raya.tasks.update_user_access_joined_group(group, user)
         if result:
-            await update.message.reply_text(
+            await query.message.reply_text(
                 "User access updated for all group documents."
             )
         else:
-            await update.message.reply_text(
+            await query.message.reply_text(
                 "Some document access updates failed:\n"
                 + "\n".join(f"{doc_id}: {error}" for doc_id, error in errors.items())
             )
@@ -191,8 +192,8 @@ async def give_access(update: Update, context: CallbackContext) -> int:
 
 async def select_group(update: Update, context: CallbackContext) -> int:
     message_text = update.message.text.strip()
-
-    group_id = int(message_text.split("_")[1])
+    match = re.match(r"^/(\w+)_([\d]+)(?:@[\w\d_]+)?$", message_text)
+    group_id = int(match.group(2))
     group = await db_sync_services.get_group_by_id(group_id)
 
     if not group:
@@ -323,7 +324,8 @@ async def revoke_access_start(update: Update, context: CallbackContext) -> int:
 
 async def revoke_select_group(update: Update, context: CallbackContext) -> int:
     text = update.message.text.strip()
-    group_id = int(text.split("_")[1])
+    match = re.match(r"^/(\w+)_([\d]+)(?:@[\w\d_]+)?$", text)
+    group_id = int(match.group(2))
     group = await db_sync_services.get_group_by_id(group_id)
 
     if not group:
@@ -390,7 +392,8 @@ async def remove_user_start(update: Update, context: CallbackContext) -> int:
 
 async def remove_select_group(update: Update, context: CallbackContext) -> int:
     text = update.message.text.strip()
-    group_id = int(text.split("_")[1])
+    match = re.match(r"^/(\\w+)_([\\d]+)(?:@[\\w\\d_]+)?$", text)
+    group_id = int(match.group(2))
     group = await db_sync_services.get_group_by_id(group_id)
 
     if not group:
@@ -414,7 +417,8 @@ async def remove_select_group(update: Update, context: CallbackContext) -> int:
 
 async def remove_user(update: Update, context: CallbackContext) -> int:
     text = update.message.text.strip()
-    user_id = int(text.split("_")[1])
+    match = re.match(r"^/(\w+)_([\d]+)(?:@[\w\d_]+)?$", text)
+    user_id = int(match.group(2))
     group = context.user_data.get("selected_group")
 
     if not group:
