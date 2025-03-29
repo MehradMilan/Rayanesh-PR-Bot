@@ -1,11 +1,37 @@
-import logging
 import typing
+from datetime import timedelta
+import math
+import random
+
+import celery
+from celery.schedules import crontab
+from celery.utils.log import get_task_logger
+from core.celery import REMIND_TASKS_IN_GROUPS_QUEUE, app as celery_app
+from django.db.models import Q, Count
+from django.utils import timezone
 
 import reusable.db_sync_services as db_sync_services
 import reusable.persian_response as persian
-from user.models import TelegramUser
+from user.models import TelegramUser, Group, Task, GroupMembership
+import reusable.telegram_bots
 
-logger = logging.getLogger(__name__)
+logger = get_task_logger(__name__)
+
+
+@celery_app.on_after_finalize.connect
+def setup_periodic_tasks(sender: celery.Celery, **_) -> None:
+    sender.add_periodic_task(
+        crontab(minute="*/5"),
+        remind_taken_tasks_in_groups.s(),
+        name="remind_taken_tasks_in_groups",
+        queue=REMIND_TASKS_IN_GROUPS_QUEUE,
+    )
+    sender.add_periodic_task(
+        crontab(minute="*/3"),
+        remind_nontaken_tasks_in_groups.s(),
+        name="remind_nontaken_tasks_in_groups",
+        queue=REMIND_TASKS_IN_GROUPS_QUEUE,
+    )
 
 
 async def extract_deeplink_from_message(
@@ -38,3 +64,115 @@ async def join_group_request(telegram_user_id, group_id):
             return persian.GROUP_REQUEST_SUCCESS
         else:
             return persian.GROUP_REQUEST_ALREADY_EXIST
+
+
+@celery.shared_task(
+    name="remind_taken_tasks_in_groups", queue=REMIND_TASKS_IN_GROUPS_QUEUE
+)
+def remind_taken_tasks_in_groups():
+    groups = Group.objects.filter(task_reminder_active=True).exclude(
+        Q(chat_id__isnull=True) | Q(chat_id__exact="")
+    )
+    telegram_bot = reusable.telegram_bots.get_telegram_bot()
+    for group in groups:
+        message = persian.TAKEN_TASK_REMINDER_MESSAGE.format(
+            group_title=group.title, tasks=""
+        )
+        message = ""
+        tasks: typing.List[Task] = list(
+            group.tasks.filter(state=Task.TAKEN_STATE, deadline__gte=timezone.now())
+        )
+        for task in tasks:
+            remaining_time = task.deadline - timezone.now()
+            if remaining_time <= timedelta(hours=24):
+                remaining_hours = remaining_time.seconds // 3600
+                assignee = task.assignee_user
+
+                priority, priority_emoji = persian.PRIORITY_LEVEL_MAP.get(
+                    task.priority_level, ("نامشخص", "🟩")
+                )
+                assignee_username = assignee.username if assignee else "نامشخص"
+
+                task_details = persian.TAKEN_TASK_DETAILS.format(
+                    task_title=task.title,
+                    priority=priority,
+                    priority_emoji=priority_emoji,
+                    remaining_time=remaining_hours,
+                    assignee=assignee_username,
+                )
+                message += task_details
+
+        reusable.telegram_bots.send_message_sync(
+            bot=telegram_bot, chat_id=group.chat_id, message=message
+        )
+
+
+@celery.shared_task(
+    name="remind_nontaken_tasks_in_groups", queue=REMIND_TASKS_IN_GROUPS_QUEUE
+)
+def remind_nontaken_tasks_in_groups():
+    groups = Group.objects.filter(task_reminder_active=True).exclude(
+        Q(chat_id__isnull=True) | Q(chat_id__exact="")
+    )
+    telegram_bot = reusable.telegram_bots.get_telegram_bot()
+    for group in groups:
+        message = persian.NON_TAKEN_TASK_REMINDER_MESSAGE.format(
+            group_title=group.title, tasks=""
+        )
+        message = ""
+        tasks: typing.List[Task] = list(
+            group.tasks.filter(state=Task.INITIAL_STATE, deadline__gte=timezone.now())
+        )
+        for task in tasks:
+            priority, priority_emoji = persian.PRIORITY_LEVEL_MAP.get(
+                task.priority_level, ("نامشخص", "🟩")
+            )
+            task_details = persian.TAKEN_TASK_DETAILS.format(
+                task_title=task.title,
+                priority=priority,
+                priority_emoji=priority_emoji,
+            )
+            message += task_details
+
+        task_assignments = (
+            Task.objects.filter(
+                scope_group=group, state__in=[Task.TAKEN_STATE, Task.DONE_STATE]
+            )
+            .values("assignee_user")
+            .annotate(task_count=Count("assignee_user"))
+            .order_by("task_count")
+        )
+
+        memberships = (
+            GroupMembership.objects.filter(group=group)
+            .exclude(Q(user__username__isnull=True) | Q(user__username__exact=""))
+            .values_list("user__username", flat=True)
+        )
+        user_task_counts = {
+            assignment["assignee_user"]: assignment["task_count"]
+            for assignment in task_assignments
+        }
+        eligible_users = []
+        for user in memberships:
+            task_count = user_task_counts.get(user.id, 0)
+            weight = calculate_weight(task_count)
+            eligible_users.append((user, weight))
+
+        selected_users: typing.List[TelegramUser] = random.choices(
+            population=[user for user, weight in eligible_users],
+            weights=[weight for user, weight in eligible_users],
+            k=5,
+        )
+        for user in selected_users:
+            message += f"@{user.username} \n"
+
+        reusable.telegram_bots.send_message_sync(
+            bot=telegram_bot, chat_id=group.chat_id, message=message
+        )
+
+
+def calculate_weight(task_count, base=2, max_weight=10):
+    if task_count == 0:
+        return max_weight
+    weight = max_weight / (1 + math.log(task_count + 1, base))
+    return weight

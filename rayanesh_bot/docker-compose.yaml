@@ -48,7 +48,7 @@ services:
       "-l",
       "info",
       "-Q",
-      "db_postgres_backup",
+      "db_postgres_backup, remind_tasks_in_groups",
     ]
     volumes:
       - celery_logs:/app/logs

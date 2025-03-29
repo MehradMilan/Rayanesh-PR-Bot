@@ -177,7 +177,7 @@ async def remove_user_from_group(
 ) -> typing.Tuple[bool, typing.Dict[str, str]]:
     membership: GroupMembership = await sync_to_async(
         lambda: GroupMembership.objects.filter(group=group, user=user).first()
-    )
+    )()
     await sync_to_async(membership.delete)()
 
     group_doc_accesses = await sync_to_async(

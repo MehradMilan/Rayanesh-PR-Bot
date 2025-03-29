@@ -3,6 +3,7 @@ from telegram import Update, User, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import CallbackContext, ConversationHandler
 import typing
 import re
+from asgiref.sync import sync_to_async
 
 from django.utils import timezone
 
@@ -78,6 +79,7 @@ async def approve_join_request(update: Update, context: CallbackContext) -> None
     membership: GroupMembership = await db_sync_services.get_group_membership_by_id(
         membership_id=membership_id
     )
+    user: TelegramUser = await db_sync_services.get_user_in_group_membership(membership)
 
     if action == "approve":
         membership.is_approved = True
@@ -85,9 +87,7 @@ async def approve_join_request(update: Update, context: CallbackContext) -> None
         await db_sync_services.save_group_membership(membership)
 
         group: Group = await db_sync_services.get_group_in_group_membership(membership)
-        user: TelegramUser = await db_sync_services.get_user_in_group_membership(
-            membership
-        )
+
         telegram_link: str = group.telegram_chat_link
         if telegram_link:
             bot = reusable.telegram_bots.get_telegram_bot()
@@ -109,6 +109,7 @@ async def approve_join_request(update: Update, context: CallbackContext) -> None
         await query.message.reply_text(f"✅ {user.username or user.name} تایید شد.")
 
     elif action == "deny":
+        await sync_to_async(membership.delete)()
         await query.message.reply_text(f"❌ {user.username or user.name} رد شد.")
 
 

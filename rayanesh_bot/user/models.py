@@ -34,6 +34,7 @@ class Group(models.Model):
     closed_at = models.DateTimeField(null=True, blank=True)
     telegram_chat_link = models.CharField(max_length=255, null=True, blank=True)
     chat_id = models.CharField(max_length=63, null=True)
+    task_reminder_active = models.BooleanField(default=False)
 
     def __str__(self):
         return self.title
@@ -68,7 +69,9 @@ class Task(models.Model):
     owner_user = models.ForeignKey(
         TelegramUser, on_delete=models.CASCADE, related_name="owned_tasks"
     )
-    scope_group = models.ForeignKey(Group, on_delete=models.SET_NULL, null=True)
+    scope_group = models.ForeignKey(
+        Group, on_delete=models.SET_NULL, null=True, related_name="tasks"
+    )
     description = models.TextField()
     deadline = models.DateTimeField(null=True, blank=True)
 
