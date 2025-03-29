@@ -39,7 +39,7 @@ def send_message_sync(bot: Bot, chat_id: str | int, message: str):
     data = {
         "chat_id": chat_id,
         "text": message,
-        "parse_mode": "MarkdownV2",
+        "parse_mode": "Markdown",
     }
 
     response = requests.post(url, data=data)

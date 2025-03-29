@@ -177,7 +177,11 @@ async def list_tasks(update: Update, context: CallbackContext) -> None:
 
         task_message += f"{persian.PRIORITY_EMOJIS[priority]} {task.title}\n"
         task_message += f"ددلاین: {deadline_str}\n"
-        task_message += f"/details_{task.id} /pickup_{task.id} /done_{task.id}\n\n"
+        task_message += f"/details_{task.id}"
+        if task.state == Task.INITIAL_STATE:
+            task_message += f"/pickup_{task.id}\n\n"
+        elif task.state == Task.TAKEN_STATE:
+            task_message += f"/done_{task.id}\n\n"
 
     await update.message.reply_text(task_message)
 

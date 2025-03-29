@@ -127,7 +127,7 @@ def remind_nontaken_tasks_in_groups():
             priority, priority_emoji = persian.PRIORITY_LEVEL_MAP.get(
                 task.priority_level, ("نامشخص", "🟩")
             )
-            task_details = persian.TAKEN_TASK_DETAILS.format(
+            task_details = persian.NON_TAKEN_TASK_DETAILS.format(
                 task_title=task.title,
                 priority=priority,
                 priority_emoji=priority_emoji,
