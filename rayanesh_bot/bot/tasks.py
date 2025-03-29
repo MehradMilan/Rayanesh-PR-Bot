@@ -78,10 +78,12 @@ def remind_taken_tasks_in_groups():
         message = persian.TAKEN_TASK_REMINDER_MESSAGE.format(
             group_title=group.title, tasks=""
         )
-        message = ""
         tasks: typing.List[Task] = list(
             group.tasks.filter(state=Task.TAKEN_STATE, deadline__gte=timezone.now())
         )
+        if not tasks:
+            logger.info(f"Group {group} has no taken pending tasks.")
+            continue
         for task in tasks:
             remaining_time = task.deadline - timezone.now()
             if remaining_time <= timedelta(hours=24):
@@ -119,10 +121,12 @@ def remind_nontaken_tasks_in_groups():
         message = persian.NON_TAKEN_TASK_REMINDER_MESSAGE.format(
             group_title=group.title, tasks=""
         )
-        message = ""
-        tasks: typing.List[Task] = list(
-            group.tasks.filter(state=Task.INITIAL_STATE, deadline__gte=timezone.now())
+        tasks = group.tasks.filter(
+            state=Task.INITIAL_STATE, deadline__gte=timezone.now()
         )
+        if not tasks:
+            logger.info(f"Group {group} has no non-taken pending tasks.")
+            continue
         for task in tasks:
             priority, priority_emoji = persian.PRIORITY_LEVEL_MAP.get(
                 task.priority_level, ("نامشخص", "🟩")
@@ -131,40 +135,54 @@ def remind_nontaken_tasks_in_groups():
                 task_title=task.title,
                 priority=priority,
                 priority_emoji=priority_emoji,
+                id=task.id,
             )
             message += task_details
 
-        task_assignments = (
-            Task.objects.filter(
-                scope_group=group, state__in=[Task.TAKEN_STATE, Task.DONE_STATE]
-            )
-            .values("assignee_user")
-            .annotate(task_count=Count("assignee_user"))
-            .order_by("task_count")
-        )
+        # task_assignments = (
+        #     Task.objects.filter(
+        #         scope_group=group, state__in=[Task.TAKEN_STATE, Task.DONE_STATE]
+        #     )
+        #     .values("assignee_user")
+        #     .annotate(task_count=Count("assignee_user"))
+        #     .order_by("task_count")
+        # )
 
+        # memberships = (
+        #     GroupMembership.objects.filter(group=group)
+        #     .exclude(Q(user__username__isnull=True) | Q(user__username__exact=""))
+        #     .values_list("user__username", flat=True)
+        # )
+        # user_task_counts = {
+        #     assignment["assignee_user"]: assignment["task_count"]
+        #     for assignment in task_assignments
+        # }
+        # eligible_users = []
+        # for user in memberships:
+        #     task_count = user_task_counts.get(user.id, 0)
+        #     weight = calculate_weight(task_count)
+        #     eligible_users.append((user, weight))
+
+        # selected_users: typing.List[TelegramUser] = random.choices(
+        #     population=[user for user, weight in eligible_users],
+        #     weights=[weight for user, weight in eligible_users],
+        #     k=5,
+        # )
+        # for user in selected_users:
+        #     message += f"@{user.username} \n"
         memberships = (
-            GroupMembership.objects.filter(group=group)
+            GroupMembership.objects.filter(
+                group=group,
+            )
             .exclude(Q(user__username__isnull=True) | Q(user__username__exact=""))
             .values_list("user__username", flat=True)
+            .distinct()
+            .order_by("?")[:5]
         )
-        user_task_counts = {
-            assignment["assignee_user"]: assignment["task_count"]
-            for assignment in task_assignments
-        }
-        eligible_users = []
-        for user in memberships:
-            task_count = user_task_counts.get(user.id, 0)
-            weight = calculate_weight(task_count)
-            eligible_users.append((user, weight))
-
-        selected_users: typing.List[TelegramUser] = random.choices(
-            population=[user for user, weight in eligible_users],
-            weights=[weight for user, weight in eligible_users],
-            k=5,
-        )
-        for user in selected_users:
-            message += f"@{user.username} \n"
+        if memberships:
+            message += persian.GARDAN_BEGIRID
+            for username in memberships:
+                message += f"@{username} ".replace("_", "\_")
 
         reusable.telegram_bots.send_message_sync(
             bot=telegram_bot, chat_id=group.chat_id, message=message
