@@ -9,6 +9,7 @@ class GateAdmin(admin.ModelAdmin):
         "room_no",
         "is_open",
         "is_active",
+        "scannable",
         "open_from",
         "open_to",
         "close_from",

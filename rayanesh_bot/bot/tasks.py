@@ -7,7 +7,7 @@ import celery
 from celery.schedules import crontab
 from celery.utils.log import get_task_logger
 from core.celery import REMIND_TASKS_IN_GROUPS_QUEUE, app as celery_app
-from django.db.models import Q, Count
+from django.db.models import F, ExpressionWrapper, DurationField, Q
 from django.utils import timezone
 
 import reusable.db_sync_services as db_sync_services
@@ -21,13 +21,13 @@ logger = get_task_logger(__name__)
 @celery_app.on_after_finalize.connect
 def setup_periodic_tasks(sender: celery.Celery, **_) -> None:
     sender.add_periodic_task(
-        crontab(minute=30, hour=4),
+        crontab(minute=0, hour=8),
         remind_taken_tasks_in_groups.s(),
         name="remind_taken_tasks_in_groups",
         queue=REMIND_TASKS_IN_GROUPS_QUEUE,
     )
     sender.add_periodic_task(
-        crontab(minute=0, hour=20),
+        crontab(minute=30, hour=23),
         remind_nontaken_tasks_in_groups.s(),
         name="remind_nontaken_tasks_in_groups",
         queue=REMIND_TASKS_IN_GROUPS_QUEUE,
@@ -78,32 +78,38 @@ def remind_taken_tasks_in_groups():
         message = persian.TAKEN_TASK_REMINDER_MESSAGE.format(
             group_title=group.title, tasks=""
         )
-        tasks: typing.List[Task] = list(
-            group.tasks.filter(state=Task.TAKEN_STATE, deadline__gte=timezone.now())
+        tasks = list(
+            group.tasks.annotate(
+                remaining_time=ExpressionWrapper(
+                    F("deadline") - timezone.now(), output_field=DurationField()
+                )
+            ).filter(
+                state=Task.TAKEN_STATE,
+                deadline__gte=timezone.now(),
+                deadline__lte=timezone.now() + timedelta(hours=24),
+            )
         )
         if not tasks:
             logger.info(f"Group {group} has no taken pending tasks.")
             continue
         for task in tasks:
-            remaining_time = task.deadline - timezone.now()
-            if remaining_time <= timedelta(hours=24):
-                remaining_hours = remaining_time.seconds // 3600
-                assignee = task.assignee_user
+            remaining_hours = task.remaining_time.total_seconds() // 3600
+            assignee = task.assignee_user
 
-                priority, priority_emoji = persian.PRIORITY_LEVEL_MAP.get(
-                    task.priority_level, ("نامشخص", "🟩")
-                )
-                assignee_username = assignee.username if assignee else "نامشخص"
+            priority, priority_emoji = persian.PRIORITY_LEVEL_MAP.get(
+                task.priority_level, ("نامشخص", "🟩")
+            )
+            assignee_username = assignee.username if assignee else "نامشخص"
 
-                task_details = persian.TAKEN_TASK_DETAILS.format(
-                    task_title=task.title,
-                    priority=priority,
-                    priority_emoji=priority_emoji,
-                    remaining_time=remaining_hours,
-                    assignee=assignee_username,
-                    id=task.id,
-                )
-                message += task_details
+            task_details = persian.TAKEN_TASK_DETAILS.format(
+                task_title=task.title,
+                priority=priority,
+                priority_emoji=priority_emoji,
+                remaining_time=remaining_hours,
+                assignee=assignee_username,
+                id=task.id,
+            )
+            message += task_details
 
         reusable.telegram_bots.send_message_sync(
             bot=telegram_bot, chat_id=group.chat_id, message=message

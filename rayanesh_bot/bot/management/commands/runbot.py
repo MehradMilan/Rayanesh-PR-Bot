@@ -29,6 +29,9 @@ from bot.handlers import (
     enter_deadline,
     enter_description,
     enter_title,
+    opened_gate,
+    closed_gate,
+    deactivate_gate,
     help,
 )
 import bot.commands
@@ -97,19 +100,13 @@ class Command(BaseCommand):
             MessageHandler(filters.Regex(r"^/done_\d+(?:@\w+)?$"), mark_task_as_done)
         )
         application.add_handler(
-            MessageHandler(
-                filters.Regex(r"^/opened\d+(?:@\w+)?$"),
-            )
+            MessageHandler(filters.Regex(r"^/opened\d+(?:@\w+)?$"), opened_gate)
         )
         application.add_handler(
-            MessageHandler(
-                filters.Regex(r"^/closed_\d+(?:@\w+)?$"),
-            )
+            MessageHandler(filters.Regex(r"^/closed_\d+(?:@\w+)?$"), closed_gate)
         )
         application.add_handler(
-            MessageHandler(
-                filters.Regex(r"^/holiday_\d+(?:@\w+)?$"),
-            )
+            MessageHandler(filters.Regex(r"^/holiday_\d+(?:@\w+)?$"), deactivate_gate)
         )
 
         add_task_conv_handler = ConversationHandler(
