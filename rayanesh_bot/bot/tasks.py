@@ -78,16 +78,14 @@ def remind_taken_tasks_in_groups():
         message = persian.TAKEN_TASK_REMINDER_MESSAGE.format(
             group_title=group.title, tasks=""
         )
-        tasks = list(
-            group.tasks.annotate(
-                remaining_time=ExpressionWrapper(
-                    F("deadline") - timezone.now(), output_field=DurationField()
-                )
-            ).filter(
-                state=Task.TAKEN_STATE,
-                deadline__gte=timezone.now(),
-                deadline__lte=timezone.now() + timedelta(hours=24),
+        tasks = group.tasks.annotate(
+            remaining_time=ExpressionWrapper(
+                F("deadline") - timezone.now(), output_field=DurationField()
             )
+        ).filter(
+            state=Task.TAKEN_STATE,
+            deadline__gte=timezone.now(),
+            deadline__lte=timezone.now() + timedelta(hours=24),
         )
         if not tasks:
             logger.info(f"Group {group} has no taken pending tasks.")

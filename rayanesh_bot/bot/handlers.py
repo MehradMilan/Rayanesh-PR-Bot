@@ -11,6 +11,7 @@ from django.utils import timezone
 from django.db.models import Case, When, IntegerField, Value
 
 from user.models import TelegramUser, Group, Task
+from music.models import Song, Playlist
 from raya.models import Gate
 import reusable.db_sync_services as db_sync_services
 from bot.tasks import extract_deeplink_from_message
@@ -144,7 +145,9 @@ async def list_tasks(update: Update, context: CallbackContext) -> None:
     tasks = await sync_to_async(
         lambda: list(
             Task.objects.filter(
-                scope_group=group, state__in=[Task.INITIAL_STATE, Task.TAKEN_STATE]
+                scope_group=group,
+                state__in=[Task.INITIAL_STATE, Task.TAKEN_STATE],
+                deadline__gte=timezone.now(),
             )
             .annotate(
                 priority_order=Case(
@@ -178,7 +181,7 @@ async def list_tasks(update: Update, context: CallbackContext) -> None:
 
         task_message += f"{persian.PRIORITY_EMOJIS[priority]} {task.title}\n"
         task_message += f"ددلاین: {deadline_str}\n"
-        task_message += f"/details_{task.id}"
+        task_message += f"/details_{task.id} "
         if task.state == Task.INITIAL_STATE:
             task_message += f"/pickup_{task.id}\n\n"
         elif task.state == Task.TAKEN_STATE:
@@ -434,6 +437,85 @@ async def deactivate_gate(update: Update, context: CallbackContext) -> None:
     gate: Gate = response
     await db_sync_services.deactivate_gate(gate=gate)
     await update.message.reply_text(persian.HOLIDAY_GATE_RESPONSE)
+
+
+async def send_music_start(update: Update, context: CallbackContext):
+    user = update.effective_user
+    telegram_user = await db_sync_services.get_telegram_user_by_id(telegram_id=user.id)
+
+    playlists = await sync_to_async(
+        lambda: list(Playlist.objects.filter(is_active=True, is_public=True))
+    )()
+    if not playlists:
+        await update.message.reply_text("There are no public playlists available.")
+        return ConversationHandler.END
+
+    keyboard = [
+        [InlineKeyboardButton(p.name, callback_data=str(p.id))] for p in playlists
+    ]
+    await update.message.reply_text(
+        "Choose a playlist to add your music to:",
+        reply_markup=InlineKeyboardMarkup(keyboard),
+    )
+    return bot.states.CHOOSE_PLAYLIST
+
+
+async def choose_playlist(update: Update, context: CallbackContext):
+    query = update.callback_query
+    await query.answer()
+
+    playlist_id = int(query.data)
+    context.user_data["playlist_id"] = playlist_id
+
+    await query.message.reply_text("Send me the music file now (as audio or document).")
+    return bot.states.SEND_MUSIC
+
+
+async def receive_music(update: Update, context: CallbackContext):
+    message = update.message
+    audio = message.audio or message.document
+
+    if not audio:
+        await update.message.reply_text("Please send a music file.")
+        return bot.states.SEND_MUSIC
+
+    context.user_data["file_message"] = message
+    await update.message.reply_text("What name should I give this track?")
+    return bot.states.ENTER_NAME
+
+
+async def receive_name(update: Update, context: CallbackContext):
+    user = update.effective_user
+    telegram_user = await db_sync_services.get_telegram_user_by_id(telegram_id=user.id)
+
+    song_name = update.message.text
+    playlist_id = context.user_data["playlist_id"]
+    playlist = await sync_to_async(lambda: Playlist.objects.get(id=playlist_id))()
+
+    original_message = context.user_data["file_message"]
+    forwarded = await original_message.forward(chat_id=settings.MUSIC_CHANNEL)
+
+    caption = f"🎵 {song_name}\n- Sent by {telegram_user.name}"
+
+    try:
+        await context.bot.edit_message_caption(
+            chat_id=settings.MUSIC_CHANNEL,
+            message_id=forwarded.message_id,
+            caption=caption,
+        )
+    except Exception:
+        pass
+
+    song = Song.objects.create(
+        name=song_name,
+        channel_message_id=str(forwarded.message_id),
+        added_by=telegram_user,
+        caption=caption,
+    )
+    playlist.songs.add(song)
+
+    await update.message.reply_text("✅ Your music has been added to the playlist!")
+    return ConversationHandler.END
 
 
 async def cancel(update: Update, context: CallbackContext) -> int:
