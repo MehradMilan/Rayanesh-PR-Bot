@@ -32,6 +32,10 @@ from bot.handlers import (
     opened_gate,
     closed_gate,
     deactivate_gate,
+    choose_playlist,
+    send_music_start,
+    receive_music,
+    receive_name,
     help,
 )
 import bot.commands
@@ -131,6 +135,23 @@ class Command(BaseCommand):
             fallbacks=[CommandHandler(bot.commands.CANCEL_COMMAND, cancel)],
         )
         application.add_handler(add_task_conv_handler)
+
+        send_music_handler = ConversationHandler(
+            entry_points=[CommandHandler("send_music", send_music_start)],
+            states={
+                bot.states.CHOOSE_PLAYLIST: [CallbackQueryHandler(choose_playlist)],
+                bot.states.SEND_MUSIC: [
+                    MessageHandler(
+                        filters.AUDIO | filters.Document.AUDIO, receive_music
+                    )
+                ],
+                bot.states.ENTER_NAME: [
+                    MessageHandler(filters.TEXT & ~filters.COMMAND, receive_name)
+                ],
+            },
+            fallbacks=[CommandHandler(bot.commands.CANCEL_COMMAND, cancel)],
+        )
+        application.add_handler(send_music_handler)
 
         application.add_handler(CommandHandler(bot.commands.HELP_COMMAND, help))
 

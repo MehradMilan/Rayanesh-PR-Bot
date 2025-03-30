@@ -113,7 +113,9 @@ async def send_group_chat_id_to_healthcheck_channel(
         return
 
     try:
-        message = f"Group {chat.title} chat ID:\n`{chat.id}`"
+        message = f"Group {chat.title} chat ID:\n`{chat.id}`".replace(
+            "_", "\_"
+        ).replace("-", "\-")
         await reusable.telegram_bots.get_raya_bot().send_message(
             chat_id=settings.HEALTHCHECK_CHAT_ID, text=message, parse_mode="MarkdownV2"
         )
@@ -444,7 +446,9 @@ async def send_music_start(update: Update, context: CallbackContext):
     telegram_user = await db_sync_services.get_telegram_user_by_id(telegram_id=user.id)
 
     playlists = await sync_to_async(
-        lambda: list(Playlist.objects.filter(is_active=True, is_public=True))
+        lambda: list(
+            Playlist.objects.filter(is_active=True, is_public=True, is_accessible=True)
+        )
     )()
     if not playlists:
         await update.message.reply_text("There are no public playlists available.")
@@ -493,13 +497,13 @@ async def receive_name(update: Update, context: CallbackContext):
     playlist = await sync_to_async(lambda: Playlist.objects.get(id=playlist_id))()
 
     original_message = context.user_data["file_message"]
-    forwarded = await original_message.forward(chat_id=settings.MUSIC_CHANNEL)
+    forwarded = await original_message.forward(chat_id=settings.MUSIC_CHANNEL_CHAT_ID)
 
     caption = f"🎵 {song_name}\n- Sent by {telegram_user.name}"
 
     try:
         await context.bot.edit_message_caption(
-            chat_id=settings.MUSIC_CHANNEL,
+            chat_id=settings.MUSIC_CHANNEL_CHAT_ID,
             message_id=forwarded.message_id,
             caption=caption,
         )
