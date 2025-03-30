@@ -5,13 +5,14 @@ from telegram.ext import CallbackContext, ConversationHandler
 from datetime import timedelta
 from asgiref.sync import sync_to_async
 import typing
+import asyncio
 
 from django.conf import settings
 from django.utils import timezone
-from django.db.models import Case, When, IntegerField, Value
+from django.db.models import Case, When, IntegerField, Value, Q
 
 from user.models import TelegramUser, Group, Task
-from music.models import Song, Playlist
+from music.models import Song, Playlist, SentSong
 from raya.models import Gate
 import reusable.db_sync_services as db_sync_services
 from bot.tasks import extract_deeplink_from_message
@@ -447,7 +448,10 @@ async def send_music_start(update: Update, context: CallbackContext):
 
     playlists = await sync_to_async(
         lambda: list(
-            Playlist.objects.filter(is_active=True, is_public=True, is_accessible=True)
+            Playlist.objects.filter(
+                Q(is_active=True, is_public=True, is_accessible=True)
+                | Q(owner=telegram_user)
+            ).distinct()
         )
     )()
     if not playlists:
@@ -499,7 +503,7 @@ async def receive_name(update: Update, context: CallbackContext):
     original_message = context.user_data["file_message"]
     forwarded = await original_message.forward(chat_id=settings.MUSIC_CHANNEL_CHAT_ID)
 
-    caption = f"🎵 {song_name}\n- Sent by {telegram_user.name}"
+    caption = f"🎵 {song_name}\n💫 Sent by {telegram_user.username or telegram_user.name}\n\n◾ @{settings.RAYANESH_CHANNEL_ID}"
 
     try:
         await context.bot.edit_message_caption(
@@ -510,15 +514,147 @@ async def receive_name(update: Update, context: CallbackContext):
     except Exception:
         pass
 
-    song = Song.objects.create(
-        name=song_name,
-        channel_message_id=str(forwarded.message_id),
-        added_by=telegram_user,
-        caption=caption,
-    )
-    playlist.songs.add(song)
+    await sync_to_async(
+        lambda: playlist.songs.add(
+            Song.objects.create(
+                name=song_name,
+                channel_message_id=str(forwarded.message_id),
+                added_by=telegram_user,
+                caption=caption,
+            )
+        )
+    )()
 
     await update.message.reply_text("✅ Your music has been added to the playlist!")
+    return ConversationHandler.END
+
+
+async def listen_music_start(update: Update, context: CallbackContext):
+    user = update.effective_user
+    telegram_user = await db_sync_services.get_telegram_user_by_id(telegram_id=user.id)
+
+    playlists = await sync_to_async(
+        lambda: list(
+            Playlist.objects.filter(
+                Q(is_active=True, is_public=True, is_accessible=True)
+                | Q(owner=telegram_user)
+            ).distinct()
+        )
+    )()
+    if not playlists:
+        await update.message.reply_text("🎧 No accessible playlists available.")
+        return ConversationHandler.END
+
+    keyboard = [
+        [InlineKeyboardButton(p.name, callback_data=str(p.id))] for p in playlists
+    ]
+    await update.message.reply_text(
+        "Choose a playlist to listen to:",
+        reply_markup=InlineKeyboardMarkup(keyboard),
+    )
+    return bot.states.LISTEN_CHOOSE_PLAYLIST
+
+
+async def listen_choose_playlist(update: Update, context: CallbackContext):
+    query = update.callback_query
+    await query.answer()
+
+    playlist_id = int(query.data)
+    context.user_data["playlist_id"] = playlist_id
+
+    keyboard = [
+        [
+            InlineKeyboardButton("✅ Yes", callback_data="yes"),
+            InlineKeyboardButton("❌ No", callback_data="no"),
+        ]
+    ]
+    await query.message.reply_text(
+        "Do you want to delete previously sent tracks?",
+        reply_markup=InlineKeyboardMarkup(keyboard),
+    )
+    return bot.states.CONFIRM_DELETE
+
+
+async def confirm_delete(update: Update, context: CallbackContext):
+    query = update.callback_query
+    await query.answer()
+
+    telegram_id = update.effective_user.id
+    telegram_user = await db_sync_services.get_telegram_user_by_id(
+        telegram_id=telegram_id
+    )
+
+    chat_id = update.effective_chat.id
+    playlist_id = context.user_data["playlist_id"]
+
+    if query.data == "yes":
+        sent_songs = await sync_to_async(
+            lambda: list(SentSong.objects.filter(user=telegram_user, chat_id=chat_id))
+        )()
+        for sent in sent_songs:
+            try:
+                await context.bot.delete_message(
+                    chat_id=chat_id, message_id=int(sent.pv_message_id)
+                )
+            except Exception:
+                pass
+        await sync_to_async(
+            lambda: SentSong.objects.filter(
+                user=telegram_user, chat_id=chat_id
+            ).delete()
+        )()
+
+    playlist = await sync_to_async(lambda: Playlist.objects.get(id=playlist_id))()
+
+    if playlist.cover_message_id:
+        try:
+            msg = await context.bot.forward_message(
+                chat_id=chat_id,
+                from_chat_id=settings.MUSIC_CHANNEL_CHAT_ID,
+                message_id=int(playlist.cover_message_id),
+            )
+            await context.bot.edit_message_caption(
+                chat_id=settings.MUSIC_CHANNEL_CHAT_ID,
+                message_id=str(msg.message_id),
+                caption=persian.PLAYLIST_COVER_CAPTION.format(
+                    name=playlist.name,
+                    username=telegram_user.username,
+                    created_at=playlist.created_at.date,
+                    description=playlist.description,
+                ),
+            )
+            await sync_to_async(SentSong.objects.create)(
+                user=telegram_user,
+                chat_id=str(chat_id),
+                pv_message_id=str(msg.message_id),
+                playlist=playlist,
+            )
+        except Exception:
+            pass
+
+    songs = await sync_to_async(
+        lambda: list(playlist.songs.all().order_by("forwarded_at"))
+    )()
+    sleep_time = max(0.1, min(5 / len(songs), 1.5)) if songs else 0
+
+    for song in songs:
+        try:
+            msg = await context.bot.forward_message(
+                chat_id=chat_id,
+                from_chat_id=settings.MUSIC_CHANNEL_CHAT_ID,
+                message_id=int(song.channel_message_id),
+            )
+            await sync_to_async(SentSong.objects.create)(
+                user=telegram_user,
+                chat_id=str(chat_id),
+                pv_message_id=str(msg.message_id),
+                playlist=playlist,
+            )
+            await asyncio.sleep(sleep_time)
+        except Exception:
+            continue
+
+    await query.message.reply_text("🎶 Your playlist is ready to enjoy!")
     return ConversationHandler.END
 
 

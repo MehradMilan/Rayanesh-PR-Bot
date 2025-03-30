@@ -36,6 +36,9 @@ from bot.handlers import (
     send_music_start,
     receive_music,
     receive_name,
+    listen_choose_playlist,
+    listen_music_start,
+    confirm_delete,
     help,
 )
 import bot.commands
@@ -152,6 +155,18 @@ class Command(BaseCommand):
             fallbacks=[CommandHandler(bot.commands.CANCEL_COMMAND, cancel)],
         )
         application.add_handler(send_music_handler)
+
+        listen_music_handler = ConversationHandler(
+            entry_points=[CommandHandler("listen_music", listen_music_start)],
+            states={
+                bot.states.LISTEN_CHOOSE_PLAYLIST: [
+                    CallbackQueryHandler(listen_choose_playlist)
+                ],
+                bot.states.CONFIRM_DELETE: [CallbackQueryHandler(confirm_delete)],
+            },
+            fallbacks=[CommandHandler(bot.commands.CANCEL_COMMAND, cancel)],
+        )
+        application.add_handler(listen_music_handler)
 
         application.add_handler(CommandHandler(bot.commands.HELP_COMMAND, help))
 

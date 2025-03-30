@@ -309,3 +309,13 @@ CLOSED_GATE_RESPONSE = """
 HOLIDAY_GATE_RESPONSE = """
 باشه پس. شوبز. 🌚
 """
+
+PLAYLIST_COVER_CAPTION = """
+Playlist: {name}
+Owner: @{username}
+
+On the air from: {created_at}
+---
+
+{description}
+"""
