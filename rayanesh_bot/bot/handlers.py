@@ -649,11 +649,6 @@ async def confirm_delete(update: Update, context: CallbackContext):
 
     if playlist.cover_message_id:
         try:
-            msg = await context.bot.copy_message(
-                chat_id=chat_id,
-                from_chat_id=settings.MUSIC_CHANNEL_CHAT_ID,
-                message_id=int(playlist.cover_message_id),
-            )
             caption_text = persian.PLAYLIST_COVER_CAPTION.format(
                 name=playlist.name,
                 username=telegram_user.username,
@@ -661,7 +656,12 @@ async def confirm_delete(update: Update, context: CallbackContext):
                 created_at=playlist.created_at.strftime("%Y-%m-%d"),
                 description=playlist.description or "No description.",
             )
-            await update.effective_chat.send_message(caption_text)
+            msg = await context.bot.copy_message(
+                chat_id=chat_id,
+                from_chat_id=settings.MUSIC_CHANNEL_CHAT_ID,
+                message_id=int(playlist.cover_message_id),
+                caption=caption_text,
+            )
             await sync_to_async(SentSong.objects.create)(
                 user=telegram_user,
                 chat_id=str(chat_id),
@@ -735,15 +735,17 @@ async def create_playlist_cover(update: Update, context: CallbackContext):
         await update.message.reply_text("❗Please send a photo.")
         return bot.states.CREATE_PLAYLIST_COVER
 
-    file_id = photo[-1].file_id
-
-    forwarded = await update.message.forward(chat_id=settings.MUSIC_CHANNEL_CHAT_ID)
+    sent = await context.bot.copy_message(
+        chat_id=settings.MUSIC_CHANNEL_CHAT_ID,
+        from_chat_id=update.effective_chat.id,
+        message_id=update.message.message_id,
+    )
 
     playlist = await sync_to_async(Playlist.objects.create)(
         name=context.user_data["playlist_name"],
         owner=telegram_user,
         description=context.user_data["playlist_description"],
-        cover_message_id=str(forwarded.message_id),
+        cover_message_id=str(sent.message_id),
         is_active=True,
     )
 
@@ -818,11 +820,11 @@ async def show_playlist_details(update: Update, context: CallbackContext):
                 chat_id=query.message.chat.id,
                 from_chat_id=settings.MUSIC_CHANNEL_CHAT_ID,
                 message_id=int(playlist.cover_message_id),
+                caption=caption,
             )
         except Exception as e:
             logger.error(e)
 
-    await query.message.reply_text(caption)
     return ConversationHandler.END
 
 

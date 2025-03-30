@@ -46,6 +46,7 @@ from bot.handlers import (
     my_playlists,
     show_playlist_details,
     toggle_playlist_visibility,
+    handle_send_to_raya,
     help,
 )
 import bot.commands
@@ -163,6 +164,9 @@ class Command(BaseCommand):
                 ],
                 bot.states.ENTER_NAME: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, receive_name)
+                ],
+                bot.states.SEND_TO_RAYAMUSIC: [
+                    CallbackQueryHandler(handle_send_to_raya)
                 ],
             },
             fallbacks=[CommandHandler(bot.commands.CANCEL_COMMAND, cancel)],

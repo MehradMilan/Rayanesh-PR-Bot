@@ -315,7 +315,7 @@ PLAYLIST_COVER_CAPTION = """
 👤 Owner: @{username}
 
 🎵 Songs count: {count}
-📅 Created at: {created_at}
+📅 Playlist on the air from: {created_at}
 ---
 {description}
 """
