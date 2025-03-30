@@ -4,6 +4,7 @@ from telegram import User
 
 from user.models import TelegramUser, Group, GroupMembership, Task
 from document.models import Document, DocumentGroupAccess, DocumentUserAccess
+from raya.models import Gate
 
 
 @sync_to_async
@@ -174,3 +175,31 @@ def get_document_from_document_user_access(dua: DocumentUserAccess) -> Document:
 @sync_to_async
 def get_document_from_document_group_access(dga: DocumentGroupAccess) -> Document:
     return dga.document
+
+
+@sync_to_async
+def close_gate(gate: Gate) -> None:
+    gate.is_open = False
+    gate.save()
+    return
+
+
+@sync_to_async
+def open_gate(gate: Gate) -> None:
+    gate.is_open = True
+    gate.save()
+    return
+
+
+@sync_to_async
+def deactivate_gate(gate: Gate) -> None:
+    gate.is_active = False
+    gate.save()
+    return
+
+
+@sync_to_async
+def activate_gate(gate: Gate) -> None:
+    gate.is_active = True
+    gate.save()
+    return

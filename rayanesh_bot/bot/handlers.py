@@ -11,6 +11,7 @@ from django.utils import timezone
 from django.db.models import Case, When, IntegerField, Value
 
 from user.models import TelegramUser, Group, Task
+from raya.models import Gate
 import reusable.db_sync_services as db_sync_services
 from bot.tasks import extract_deeplink_from_message
 import bot.commands
@@ -369,6 +370,70 @@ async def save_new_task(update_or_query, context: CallbackContext):
     await sync_to_async(task.save)()
     await update_or_query.message.reply_text(persian.TASK_CREATED_SUCCESS)
     return ConversationHandler.END
+
+
+async def gate_group_filters(
+    update: Update, command_str: str
+) -> typing.Tuple[bool, str | Gate]:
+    message = update.message.text
+
+    if not update.message.chat.type.upper() in ["GROUP", "SUPERGROUP"]:
+        return False, persian.NO_GROUP
+    chat_id = update.message.chat.id
+    group: Group = await sync_to_async(
+        lambda: Group.objects.filter(chat_id=chat_id).first()
+    )()
+    if not group:
+        return False, persian.GROUP_NOT_FOUND
+
+    gate_id = re.match(rf"/{command_str}_(\d+)(?:@\w+)?", message).groups()[0]
+    gate = await sync_to_async(
+        lambda: Gate.objects.filter(id=gate_id, gate_keepers_group=group).first()
+    )()
+    if gate is None:
+        return False, persian.GATE_NOT_FOUND
+
+    return True, gate
+
+
+async def closed_gate(update: Update, context: CallbackContext) -> None:
+    is_ok, response = await gate_group_filters(update=update, command_str="closed")
+    if not is_ok:
+        logger.info(f"Invalid command on closing gate: {response}")
+        return
+    user = await db_sync_services.get_telegram_user_by_id(
+        telegram_id=update.effective_user.id
+    )
+    gate: Gate = response
+    await db_sync_services.close_gate(gate=gate)
+    await update.message.reply_text(persian.CLOSED_GATE_RESPONSE.format(name=user.name))
+
+
+async def opened_gate(update: Update, context: CallbackContext) -> None:
+    is_ok, response = await gate_group_filters(update=update, command_str="opened")
+    if not is_ok:
+        logger.info(f"Invalid command on opening gate: {response}")
+        return
+    user = await db_sync_services.get_telegram_user_by_id(
+        telegram_id=update.effective_user.id
+    )
+    gate: Gate = response
+    await db_sync_services.open_gate(gate=gate)
+    await db_sync_services.activate_gate(gate=gate)
+    await update.message.reply_text(persian.OPENED_GATE_RESPONSE.format(name=user.name))
+
+
+async def deactivate_gate(update: Update, context: CallbackContext) -> None:
+    is_ok, response = await gate_group_filters(update=update, command_str="holiday")
+    if not is_ok:
+        logger.info(f"Invalid command on deactivating gate: {response}")
+        return
+    user = await db_sync_services.get_telegram_user_by_id(
+        telegram_id=update.effective_user.id
+    )
+    gate: Gate = response
+    await db_sync_services.deactivate_gate(gate=gate)
+    await update.message.reply_text(persian.HOLIDAY_GATE_RESPONSE)
 
 
 async def cancel(update: Update, context: CallbackContext) -> int:

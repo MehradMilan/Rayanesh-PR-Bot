@@ -4,18 +4,22 @@ import os
 import subprocess
 from pathlib import Path
 from asgiref.sync import sync_to_async
+import pytz
 
 from django.conf import settings
 import celery
 from celery.schedules import crontab
 from celery.utils.log import get_task_logger
-from core.celery import DB_POSTGRES_BACKUP_QUEUE, app as celery_app
+from core.celery import DB_POSTGRES_BACKUP_QUEUE, GATEKEEPERS_QUEUE, app as celery_app
+from django.utils import timezone
 
 import reusable.db_sync_services as db_sync_services
 from user.models import TelegramUser, Group, GroupMembership
 from document.models import Document, DocumentGroupAccess, DocumentUserAccess
 import raya.services
 import reusable.telegram_bots
+import raya.models
+import reusable.persian_response as persian
 
 logger = get_task_logger(__name__)
 
@@ -27,6 +31,12 @@ def setup_periodic_tasks(sender: celery.Celery, **_) -> None:
         backup_postgres_database.s(),
         name="backup_postgres_database",
         queue=DB_POSTGRES_BACKUP_QUEUE,
+    )
+    sender.add_periodic_task(
+        crontab(minute=1, hour="*"),
+        check_gate_status.s(),
+        name="check_gate_status",
+        queue=GATEKEEPERS_QUEUE,
     )
 
 
@@ -257,3 +267,56 @@ def backup_postgres_database():
         if backup_path.exists():
             backup_path.unlink()
             logger.info(f"Temporary backup file deleted: {backup_path}")
+
+
+@celery.shared_task(name="check_gate_status", queue=GATEKEEPERS_QUEUE)
+def check_gate_status():
+    tehran_tz = pytz.timezone("Asia/Tehran")
+    now = timezone.now().astimezone(tehran_tz)
+    current_time = now.time()
+    weekday = now.weekday()
+
+    if now.hour == 1:
+        for gate in raya.models.Gate.objects.filter(scannable=True).exclude(
+            gate_keepers_group__is_null=True
+        ):
+            if weekday in [3, 4]:  # Thursday (3), Friday (4)
+                gate.is_active = False
+            else:
+                gate.is_active = True
+            gate.save()
+
+    telegram_bot = reusable.telegram_bots.get_telegram_bot()
+    for gate in raya.models.Gate.objects.filter(scannable=True, is_active=True):
+        if (
+            not gate.is_open
+            and gate.open_from
+            and gate.open_to
+            and gate.open_from <= current_time <= gate.open_to
+        ):
+            reusable.telegram_bots.send_message_sync(
+                bot=telegram_bot,
+                chat_id=gate.gate_keepers_group.chat_id,
+                message=persian.OPEN_GATE_MESSAGES.get(
+                    now.hour, persian.OPEN_GATE_MESSAGE_DEF
+                ).format(id=gate.id),
+            )
+            logger.info(
+                f"Reminded to open the door in Gatekeepers at {now.hour} O'clock."
+            )
+        elif (
+            gate.is_open
+            and gate.close_from
+            and gate.close_to
+            and gate.close_from <= current_time <= gate.close_to
+        ):
+            reusable.telegram_bots.send_message_sync(
+                bot=telegram_bot,
+                chat_id=gate.gate_keepers_group.chat_id,
+                message=persian.CLOSE_GATE_MESSAGES.get(
+                    now.hour, persian.CLOSE_GATE_MESSAGE_DEF
+                ).format(id=gate.id),
+            )
+            logger.info(
+                f"Reminded to close the door in Gatekeepers at {now.hour} O'clock."
+            )

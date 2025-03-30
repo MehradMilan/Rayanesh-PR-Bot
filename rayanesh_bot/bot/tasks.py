@@ -21,13 +21,13 @@ logger = get_task_logger(__name__)
 @celery_app.on_after_finalize.connect
 def setup_periodic_tasks(sender: celery.Celery, **_) -> None:
     sender.add_periodic_task(
-        crontab(minute="*/5"),
+        crontab(minute=30, hour=4),
         remind_taken_tasks_in_groups.s(),
         name="remind_taken_tasks_in_groups",
         queue=REMIND_TASKS_IN_GROUPS_QUEUE,
     )
     sender.add_periodic_task(
-        crontab(minute="*/3"),
+        crontab(minute=0, hour=20),
         remind_nontaken_tasks_in_groups.s(),
         name="remind_nontaken_tasks_in_groups",
         queue=REMIND_TASKS_IN_GROUPS_QUEUE,
@@ -101,6 +101,7 @@ def remind_taken_tasks_in_groups():
                     priority_emoji=priority_emoji,
                     remaining_time=remaining_hours,
                     assignee=assignee_username,
+                    id=task.id,
                 )
                 message += task_details
 
@@ -171,9 +172,7 @@ def remind_nontaken_tasks_in_groups():
         # for user in selected_users:
         #     message += f"@{user.username} \n"
         memberships = (
-            GroupMembership.objects.filter(
-                group=group,
-            )
+            GroupMembership.objects.filter(group=group, is_approved=True)
             .exclude(Q(user__username__isnull=True) | Q(user__username__exact=""))
             .values_list("user__username", flat=True)
             .distinct()

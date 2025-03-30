@@ -96,6 +96,21 @@ class Command(BaseCommand):
         application.add_handler(
             MessageHandler(filters.Regex(r"^/done_\d+(?:@\w+)?$"), mark_task_as_done)
         )
+        application.add_handler(
+            MessageHandler(
+                filters.Regex(r"^/opened\d+(?:@\w+)?$"),
+            )
+        )
+        application.add_handler(
+            MessageHandler(
+                filters.Regex(r"^/closed_\d+(?:@\w+)?$"),
+            )
+        )
+        application.add_handler(
+            MessageHandler(
+                filters.Regex(r"^/holiday_\d+(?:@\w+)?$"),
+            )
+        )
 
         add_task_conv_handler = ConversationHandler(
             entry_points=[
