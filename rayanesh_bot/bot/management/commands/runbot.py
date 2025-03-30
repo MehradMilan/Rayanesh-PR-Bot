@@ -69,6 +69,7 @@ class Command(BaseCommand):
                 (bot.commands.SEND_MUSIC_COMMAND, "اضافه کردن موسیقی به پلی‌لیست"),
                 (bot.commands.LISTEN_MUSIC_COMMAND, "موسیقی بشنویم!"),
                 (bot.commands.MY_PLAYLISTS_COMMAND, "تمام پلی‌لیست‌ها"),
+                (bot.commands.CREATE_PLAYLIST_COMMAND, "پلی‌لیست خودتو بساز!"),
             ]
         )
 

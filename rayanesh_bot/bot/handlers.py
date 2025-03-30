@@ -526,8 +526,40 @@ async def receive_name(update: Update, context: CallbackContext):
             )
         )
     )()
+    context.user_data["last_forwarded_message_id"] = forwarded.message_id
 
-    await update.message.reply_text("✅ Your music has been added to the playlist!")
+    keyboard = [
+        [
+            InlineKeyboardButton("✅ Yes", callback_data="send_to_raya_yes"),
+            InlineKeyboardButton("❌ No", callback_data="send_to_raya_no"),
+        ]
+    ]
+    await update.message.reply_text(
+        "✅ Your music has been added to the playlist!\n\n"
+        "Do you want to send this track to رایاموزیک?",
+        reply_markup=InlineKeyboardMarkup(keyboard),
+    )
+    return bot.states.SEND_TO_RAYAMUSIC
+
+
+async def handle_send_to_raya(update: Update, context: CallbackContext):
+    query = update.callback_query
+    await query.answer()
+
+    if query.data == "send_to_raya_yes":
+        try:
+            await context.bot.copy_message(
+                chat_id=settings.RAYAMUSIC_CHANNEL_CHAT_ID,
+                from_chat_id=settings.MUSIC_CHANNEL_CHAT_ID,
+                message_id=int(context.user_data["last_forwarded_message_id"]),
+            )
+            await query.message.reply_text("🎶 Track sent to رایاموزیک!")
+        except Exception as e:
+            logger.error(f"Failed to forward to RAYAMUSIC channel: {e}")
+            await query.message.reply_text("⚠️ Failed to send to رایاموزیک.")
+    else:
+        await query.message.reply_text("👍 Got it, not sending to رایاموزیک.")
+
     return ConversationHandler.END
 
 
@@ -595,7 +627,9 @@ async def confirm_delete(update: Update, context: CallbackContext):
         sent_songs = await sync_to_async(
             lambda: list(SentSong.objects.filter(user=telegram_user, chat_id=chat_id))
         )()
-        sleep_time = max(0.1, min(5 / len(sent_songs), 1.5)) if sent_songs else 0
+        sleep_time = (
+            min(0.3, max(0.1, min(5 / len(sent_songs), 1.5))) if sent_songs else 0
+        )
         for sent in sent_songs:
             try:
                 await context.bot.delete_message(
@@ -603,7 +637,7 @@ async def confirm_delete(update: Update, context: CallbackContext):
                 )
             except Exception as e:
                 logger.error(e)
-            asyncio.sleep(sleep_time)
+            await asyncio.sleep(sleep_time)
         await sync_to_async(
             lambda: SentSong.objects.filter(
                 user=telegram_user, chat_id=chat_id
@@ -615,22 +649,19 @@ async def confirm_delete(update: Update, context: CallbackContext):
 
     if playlist.cover_message_id:
         try:
-            msg = await context.bot.forward_message(
+            msg = await context.bot.copy_message(
                 chat_id=chat_id,
                 from_chat_id=settings.MUSIC_CHANNEL_CHAT_ID,
                 message_id=int(playlist.cover_message_id),
             )
-            await context.bot.edit_message_caption(
-                chat_id=settings.MUSIC_CHANNEL_CHAT_ID,
-                message_id=str(msg.message_id),
-                caption=persian.PLAYLIST_COVER_CAPTION.format(
-                    name=playlist.name,
-                    username=telegram_user.username,
-                    count=song_count,
-                    created_at=playlist.created_at.strftime("%Y-%m-%d"),
-                    description=playlist.description or "No description.",
-                ),
+            caption_text = persian.PLAYLIST_COVER_CAPTION.format(
+                name=playlist.name,
+                username=telegram_user.username,
+                count=song_count,
+                created_at=playlist.created_at.strftime("%Y-%m-%d"),
+                description=playlist.description or "No description.",
             )
+            await update.effective_chat.send_message(caption_text)
             await sync_to_async(SentSong.objects.create)(
                 user=telegram_user,
                 chat_id=str(chat_id),
@@ -643,11 +674,11 @@ async def confirm_delete(update: Update, context: CallbackContext):
     songs = await sync_to_async(
         lambda: list(playlist.songs.all().order_by("forwarded_at"))
     )()
-    sleep_time = max(0.1, min(5 / len(songs), 1.5)) if songs else 0
+    sleep_time = min(0.3, max(0.1, min(5 / len(sent_songs), 1.5))) if songs else 0
 
     for song in songs:
         try:
-            msg = await context.bot.forward_message(
+            msg = await context.bot.copy_message(
                 chat_id=chat_id,
                 from_chat_id=settings.MUSIC_CHANNEL_CHAT_ID,
                 message_id=int(song.channel_message_id),
@@ -763,7 +794,7 @@ async def show_playlist_details(update: Update, context: CallbackContext):
     if not playlist:
         await query.message.reply_text("⚠️ Playlist not found.")
         return ConversationHandler.END
-    owner = sync_to_async(lambda: playlist.owner)()
+    owner = await sync_to_async(lambda: playlist.owner)()
     owner_username = owner.username or owner.name or "Unknown"
     song_count = await sync_to_async(lambda: playlist.songs.count())()
 
@@ -783,7 +814,7 @@ async def show_playlist_details(update: Update, context: CallbackContext):
 
     if playlist.cover_message_id:
         try:
-            await context.bot.forward_message(
+            await context.bot.copy_message(
                 chat_id=query.message.chat.id,
                 from_chat_id=settings.MUSIC_CHANNEL_CHAT_ID,
                 message_id=int(playlist.cover_message_id),
