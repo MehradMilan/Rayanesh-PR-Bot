@@ -443,6 +443,9 @@ async def deactivate_gate(update: Update, context: CallbackContext) -> None:
 
 
 async def send_music_start(update: Update, context: CallbackContext):
+    check = await check_private_and_authorized(update, context)
+    if check is not None:
+        return check
     user = update.effective_user
     telegram_user = await db_sync_services.get_telegram_user_by_id(telegram_id=user.id)
 
@@ -530,6 +533,9 @@ async def receive_name(update: Update, context: CallbackContext):
 
 
 async def listen_music_start(update: Update, context: CallbackContext):
+    check = await check_private_and_authorized(update, context)
+    if check is not None:
+        return check
     user = update.effective_user
     telegram_user = await db_sync_services.get_telegram_user_by_id(telegram_id=user.id)
 
@@ -591,13 +597,15 @@ async def confirm_delete(update: Update, context: CallbackContext):
         sent_songs = await sync_to_async(
             lambda: list(SentSong.objects.filter(user=telegram_user, chat_id=chat_id))
         )()
+        sleep_time = max(0.1, min(5 / len(sent_songs), 1.5)) if sent_songs else 0
         for sent in sent_songs:
             try:
                 await context.bot.delete_message(
                     chat_id=chat_id, message_id=int(sent.pv_message_id)
                 )
-            except Exception:
-                pass
+            except Exception as e:
+                logger.error(e)
+            asyncio.sleep(sleep_time)
         await sync_to_async(
             lambda: SentSong.objects.filter(
                 user=telegram_user, chat_id=chat_id
@@ -605,6 +613,7 @@ async def confirm_delete(update: Update, context: CallbackContext):
         )()
 
     playlist = await sync_to_async(lambda: Playlist.objects.get(id=playlist_id))()
+    song_count = await sync_to_async(lambda: playlist.songs.count())()
 
     if playlist.cover_message_id:
         try:
@@ -619,8 +628,9 @@ async def confirm_delete(update: Update, context: CallbackContext):
                 caption=persian.PLAYLIST_COVER_CAPTION.format(
                     name=playlist.name,
                     username=telegram_user.username,
-                    created_at=playlist.created_at.date,
-                    description=playlist.description,
+                    count=song_count,
+                    created_at=playlist.created_at.strftime("%Y-%m-%d"),
+                    description=playlist.description or "No description.",
                 ),
             )
             await sync_to_async(SentSong.objects.create)(
@@ -629,8 +639,8 @@ async def confirm_delete(update: Update, context: CallbackContext):
                 pv_message_id=str(msg.message_id),
                 playlist=playlist,
             )
-        except Exception:
-            pass
+        except Exception as e:
+            logger.error(f"Sending cover failed: {e}")
 
     songs = await sync_to_async(
         lambda: list(playlist.songs.all().order_by("forwarded_at"))
@@ -656,6 +666,182 @@ async def confirm_delete(update: Update, context: CallbackContext):
 
     await query.message.reply_text("🎶 Your playlist is ready to enjoy!")
     return ConversationHandler.END
+
+
+async def create_playlist_start(update: Update, context: CallbackContext):
+    check = await check_private_and_authorized(update, context)
+    if check is not None:
+        return check
+    await update.message.reply_text("📝 Please enter a name for your playlist:")
+    return bot.states.CREATE_PLAYLIST_NAME
+
+
+async def create_playlist_name(update: Update, context: CallbackContext):
+    context.user_data["playlist_name"] = update.message.text
+    await update.message.reply_text("💬 Enter a description (or send - to skip):")
+    return bot.states.CREATE_PLAYLIST_DESCRIPTION
+
+
+async def create_playlist_description(update: Update, context: CallbackContext):
+    description = update.message.text
+    if description.strip() == "-":
+        description = ""
+    elif len(description) > 680:
+        await update.message.reply_text(
+            "⚠️ The description must be under 680 characters.\nPlease try again:"
+        )
+        return bot.states.CREATE_PLAYLIST_DESCRIPTION
+
+    context.user_data["playlist_description"] = description
+    await update.message.reply_text("🖼️ Now, send a photo to use as the cover image:")
+    return bot.states.CREATE_PLAYLIST_COVER
+
+
+async def create_playlist_cover(update: Update, context: CallbackContext):
+    user = update.effective_user
+    telegram_user = await db_sync_services.get_telegram_user_by_id(telegram_id=user.id)
+
+    photo = update.message.photo
+    if not photo:
+        await update.message.reply_text("❗Please send a photo.")
+        return bot.states.CREATE_PLAYLIST_COVER
+
+    file_id = photo[-1].file_id
+
+    forwarded = await update.message.forward(chat_id=settings.MUSIC_CHANNEL_CHAT_ID)
+
+    playlist = await sync_to_async(Playlist.objects.create)(
+        name=context.user_data["playlist_name"],
+        owner=telegram_user,
+        description=context.user_data["playlist_description"],
+        cover_message_id=str(forwarded.message_id),
+        is_active=True,
+    )
+
+    await update.message.reply_text(
+        f"✅ Playlist «{playlist.name}» created successfully!"
+    )
+    return ConversationHandler.END
+
+
+async def my_playlists(update: Update, context: CallbackContext):
+    check = await check_private_and_authorized(update, context)
+    if check is not None:
+        return check
+    user = update.effective_user
+    telegram_user = await db_sync_services.get_telegram_user_by_id(telegram_id=user.id)
+
+    playlists = await sync_to_async(
+        lambda: list(
+            Playlist.objects.filter(
+                Q(is_active=True, is_public=True, is_accessible=True)
+                | Q(owner=telegram_user)
+            ).distinct()
+        )
+    )()
+
+    if not playlists:
+        await update.message.reply_text("You don't have any playlists yet.")
+        return ConversationHandler.END
+
+    context.user_data["my_playlists"] = {str(p.id): p for p in playlists}
+
+    keyboard = [
+        [InlineKeyboardButton(p.name, callback_data=str(p.id))] for p in playlists
+    ]
+    await update.message.reply_text(
+        "Select a playlist to see more details:",
+        reply_markup=InlineKeyboardMarkup(keyboard),
+    )
+    return bot.states.SHOW_PLAYLIST_DETAILS
+
+
+async def show_playlist_details(update: Update, context: CallbackContext):
+    query = update.callback_query
+    await query.answer()
+
+    playlist_id = query.data
+    playlist = context.user_data["my_playlists"].get(playlist_id)
+
+    if not playlist:
+        await query.message.reply_text("⚠️ Playlist not found.")
+        return ConversationHandler.END
+
+    owner_username = playlist.owner.username or playlist.owner.name or "Unknown"
+    song_count = await sync_to_async(lambda: playlist.songs.count())()
+
+    caption = persian.PLAYLIST_COVER_CAPTION.format(
+        name=playlist.name,
+        username=owner_username,
+        count=song_count,
+        created_at=playlist.created_at.strftime("%Y-%m-%d"),
+        description=playlist.description or "No description.",
+    )
+
+    if update.effective_user.id == playlist.owner.telegram_id:
+        if playlist.is_public:
+            caption += f"\nChange visibility: /private_{playlist.id}"
+        else:
+            caption += f"\nChange visibility: /public_{playlist.id}"
+
+    if playlist.cover_message_id:
+        try:
+            await context.bot.forward_message(
+                chat_id=query.message.chat.id,
+                from_chat_id=settings.MUSIC_CHANNEL_CHAT_ID,
+                message_id=int(playlist.cover_message_id),
+            )
+        except Exception as e:
+            logger.error(e)
+
+    await query.message.reply_text(caption)
+    return ConversationHandler.END
+
+
+async def toggle_playlist_visibility(update: Update, context: CallbackContext):
+    check = await check_private_and_authorized(update, context)
+    if check is not None:
+        return check
+    user = update.effective_user
+    telegram_user = await db_sync_services.get_telegram_user_by_id(telegram_id=user.id)
+
+    text = update.message.text
+    match = re.match(r"/(public|private)_(\d+)", text)
+    if not match:
+        return
+
+    action, playlist_id = match.groups()
+    playlist = await sync_to_async(
+        lambda: Playlist.objects.filter(id=playlist_id, owner=telegram_user).first()
+    )()
+    if not playlist:
+        await update.message.reply_text("⚠️ Playlist not found or not owned by you.")
+        return
+
+    playlist.is_public = True if action == "public" else False
+    await sync_to_async(playlist.save)()
+
+    status = "now public ✅" if playlist.is_public else "now private 🔒"
+    await update.message.reply_text(
+        f"Playlist *{playlist.name}* is {status}", parse_mode="Markdown"
+    )
+
+
+async def check_private_and_authorized(update: Update, context: CallbackContext):
+    chat = update.effective_chat
+    user = update.effective_user
+
+    if chat.type.upper() != "PRIVATE":
+        await update.message.reply_text("⚠️ Please use this bot in a private chat.")
+        return ConversationHandler.END
+
+    telegram_user = await db_sync_services.get_telegram_user_by_id(telegram_id=user.id)
+    if telegram_user is None or not telegram_user.is_authorized:
+        await update.message.reply_text("🚫 You are not authorized to use this bot.")
+        return ConversationHandler.END
+
+    context.user_data["telegram_user"] = telegram_user
+    return None
 
 
 async def cancel(update: Update, context: CallbackContext) -> int:

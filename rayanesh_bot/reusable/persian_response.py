@@ -311,11 +311,11 @@ HOLIDAY_GATE_RESPONSE = """
 """
 
 PLAYLIST_COVER_CAPTION = """
-Playlist: {name}
-Owner: @{username}
+🎶 Playlist: {name}
+👤 Owner: @{username}
 
-On the air from: {created_at}
+🎵 Songs count: {count}
+📅 Created at: {created_at}
 ---
-
 {description}
 """
