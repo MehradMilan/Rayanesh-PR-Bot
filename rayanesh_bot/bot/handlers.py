@@ -446,8 +446,7 @@ async def send_music_start(update: Update, context: CallbackContext):
     check = await check_private_and_authorized(update, context)
     if check is not None:
         return check
-    user = update.effective_user
-    telegram_user = await db_sync_services.get_telegram_user_by_id(telegram_id=user.id)
+    telegram_user = context.user_data["telegram_user"]
 
     playlists = await sync_to_async(
         lambda: list(
@@ -536,8 +535,7 @@ async def listen_music_start(update: Update, context: CallbackContext):
     check = await check_private_and_authorized(update, context)
     if check is not None:
         return check
-    user = update.effective_user
-    telegram_user = await db_sync_services.get_telegram_user_by_id(telegram_id=user.id)
+    telegram_user = context.user_data["telegram_user"]
 
     playlists = await sync_to_async(
         lambda: list(
@@ -728,8 +726,7 @@ async def my_playlists(update: Update, context: CallbackContext):
     check = await check_private_and_authorized(update, context)
     if check is not None:
         return check
-    user = update.effective_user
-    telegram_user = await db_sync_services.get_telegram_user_by_id(telegram_id=user.id)
+    telegram_user = context.user_data["telegram_user"]
 
     playlists = await sync_to_async(
         lambda: list(
@@ -766,8 +763,8 @@ async def show_playlist_details(update: Update, context: CallbackContext):
     if not playlist:
         await query.message.reply_text("⚠️ Playlist not found.")
         return ConversationHandler.END
-
-    owner_username = playlist.owner.username or playlist.owner.name or "Unknown"
+    owner = sync_to_async(lambda: playlist.owner)()
+    owner_username = owner.username or owner.name or "Unknown"
     song_count = await sync_to_async(lambda: playlist.songs.count())()
 
     caption = persian.PLAYLIST_COVER_CAPTION.format(
@@ -778,7 +775,7 @@ async def show_playlist_details(update: Update, context: CallbackContext):
         description=playlist.description or "No description.",
     )
 
-    if update.effective_user.id == playlist.owner.telegram_id:
+    if update.effective_user.id == owner.telegram_id:
         if playlist.is_public:
             caption += f"\nChange visibility: /private_{playlist.id}"
         else:
@@ -802,11 +799,10 @@ async def toggle_playlist_visibility(update: Update, context: CallbackContext):
     check = await check_private_and_authorized(update, context)
     if check is not None:
         return check
-    user = update.effective_user
-    telegram_user = await db_sync_services.get_telegram_user_by_id(telegram_id=user.id)
+    telegram_user = context.user_data["telegram_user"]
 
     text = update.message.text
-    match = re.match(r"/(public|private)_(\d+)", text)
+    match = re.match(r"/(public|private)_(\d+)(?:@\w+)?", text)
     if not match:
         return
 

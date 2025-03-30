@@ -221,7 +221,8 @@ class Command(BaseCommand):
         application.add_handler(my_playlists_handler)
         application.add_handler(
             MessageHandler(
-                filters.Regex(r"^/(public|private)_\d+$"), toggle_playlist_visibility
+                filters.Regex(r"^/(public|private)_\d+(?:@\w+)?$"),
+                toggle_playlist_visibility,
             )
         )
 
