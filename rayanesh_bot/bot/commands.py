@@ -1,4 +1,4 @@
-from bot.tasks import join_group_request
+from bot.tasks import join_group_request, share_playlist
 
 JOIN_GROUP_COMMAND = "join_group"
 AUTHORIZE_COMMAND = "authorize"
@@ -12,5 +12,9 @@ LISTEN_MUSIC_COMMAND = "listen_music"
 SEND_MUSIC_COMMAND = "send_music"
 CREATE_PLAYLIST_COMMAND = "create_playlist"
 MY_PLAYLISTS_COMMAND = "my_playlists"
+SHARE_PLAYLIST_COMMAND = "share_playlist"
 
-DEEPLINK_HANDLERS = {JOIN_GROUP_COMMAND: join_group_request}
+DEEPLINK_HANDLERS = {
+    JOIN_GROUP_COMMAND: join_group_request,
+    SHARE_PLAYLIST_COMMAND: share_playlist,
+}

@@ -1,7 +1,7 @@
 import typing
 from datetime import timedelta
 import math
-import random
+from asgiref.sync import sync_to_async
 
 import celery
 from celery.schedules import crontab
@@ -13,6 +13,7 @@ from django.utils import timezone
 import reusable.db_sync_services as db_sync_services
 import reusable.persian_response as persian
 from user.models import TelegramUser, Group, Task, GroupMembership
+from music.models import Playlist, PlaylistAccess
 import reusable.telegram_bots
 
 logger = get_task_logger(__name__)
@@ -43,6 +44,32 @@ async def extract_deeplink_from_message(
         params = input.pop(0).split("-")
         return (params[0], params[1:])
     return (None, [])
+
+
+async def share_playlist(telegram_user_id, playlist_id) -> str:
+    playlist = await sync_to_async(
+        lambda: Playlist.objects.filter(
+            id=playlist_id, is_public=True, is_active=True
+        ).first()
+    )()
+    if not playlist:
+        return "⚠️ Playlist not found or not public."
+    telegram_user: TelegramUser = await db_sync_services.get_telegram_user_by_id(
+        telegram_user_id
+    )
+    has_access = await sync_to_async(
+        list(
+            lambda: PlaylistAccess.objects.filter(playlist=playlist, user=telegram_user)
+        )
+    )()
+    if not has_access:
+        await sync_to_async(PlaylistAccess.objects.create)(
+            playlist=playlist,
+            user=telegram_user,
+            shared_by=playlist.owner,
+        )
+
+    return f"✅ You now have access to playlist: {playlist.name}"
 
 
 async def join_group_request(telegram_user_id, group_id):

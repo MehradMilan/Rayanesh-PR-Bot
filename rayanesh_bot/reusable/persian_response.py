@@ -232,34 +232,34 @@ OPEN_GATE_MESSAGE_8 = """
 پنجره‌ها رو رو به حیاط باز کنید. زندگی رو دوباره آغاز کنید.
 به همه بگید «صبح بخیییرررر«.
 
-/opened_{id}  /holiday_{id}
+/opened\_{id}  /holiday\_{id}
 """
 
 OPEN_GATE_MESSAGE_9 = """
 🧠🧠🧠
 جوون ایرانی پاشو. در رایانشو باز کنییییدد. کلاسا رو بریید. هوش زدید بفرستید.
 
-/opened_{id}  /holiday_{id}
+/opened\_{id}  /holiday\_{id}
 """
 
 OPEN_GATE_MESSAGE_10 = """
 🚪🚪🚪
 پاشید دیگه گشادا :// یعنی چی که در رایانش بسته‌ست؟؟
 
-/opened_{id}  /holiday_{id}
+/opened\_{id}  /holiday\_{id}
 """
 
 CLOSE_GATE_MESSAGE_20 = """
 🏚🏚🏚
 نخود نخود هر که رود خانه‌ی خود. درو کسی می‌بنده؟ 
 
-/closed_{id}
+/closed\_{id}
 """
 
 CLOSE_GATE_MESSAGE_21 = """
 از نمک ریختن خسته شدم. ایده‌ای داشتید بگید اینو عوض کنیم.
 
-/closed_{id}
+/closed\_{id}
 """
 
 CLOSE_GATE_MESSAGE_22 = """
@@ -267,19 +267,19 @@ CLOSE_GATE_MESSAGE_22 = """
 
 بیبو بیبو بیبو. درو ببندید ابلفضلی حراست درمون نذاره.
 
-/closed_{id}
+/closed\_{id}
 """
 
 OPEN_GATE_MESSAGE_DEF = """
 درو باز کنید بچه‌ها.
 
-/opened_{id}  /holiday_{id}
+/opened\_{id}  /holiday\_{id}
 """
 
 CLOSE_GATE_MESSAGE_DEF = """
 درو ببندید بچه‌ها.
 
-/closed_{id}
+/closed\_{id}
 """
 
 OPEN_GATE_MESSAGES = {

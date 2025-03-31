@@ -9,7 +9,7 @@ import asyncio
 
 from django.conf import settings
 from django.utils import timezone
-from django.db.models import Case, When, IntegerField, Value, Q
+from django.db.models import Case, When, IntegerField, Value, Q, CharField
 
 from user.models import TelegramUser, Group, Task
 from music.models import Song, Playlist, SentSong
@@ -451,8 +451,8 @@ async def send_music_start(update: Update, context: CallbackContext):
     playlists = await sync_to_async(
         lambda: list(
             Playlist.objects.filter(
-                Q(is_active=True, is_public=True, is_accessible=True)
-                | Q(owner=telegram_user)
+                Q(is_active=True)
+                & (Q(is_public=True, is_accessible=True) | Q(owner=telegram_user))
             ).distinct()
         )
     )()
@@ -572,18 +572,54 @@ async def listen_music_start(update: Update, context: CallbackContext):
     playlists = await sync_to_async(
         lambda: list(
             Playlist.objects.filter(
-                Q(is_active=True, is_public=True, is_accessible=True)
-                | Q(owner=telegram_user)
-            ).distinct()
+                Q(is_active=True)
+                & (
+                    Q(owner=telegram_user)
+                    | Q(accesses__user=telegram_user)
+                    | Q(is_public=True, is_accessible=True)
+                )
+            )
+            .annotate(
+                access_type=Case(
+                    When(owner=telegram_user, then=Value("owner")),
+                    When(accesses__user=telegram_user, then=Value("shared")),
+                    When(is_public=True, is_accessible=True, then=Value("public")),
+                    default=Value("unknown"),
+                    output_field=CharField(),
+                )
+            )
+            .distinct()
         )
     )()
     if not playlists:
         await update.message.reply_text("🎧 No accessible playlists available.")
         return ConversationHandler.END
 
+    emoji_map = {
+        "owner": "🧺",
+        "shared": "🤝",
+        "public": "🌍",
+    }
     keyboard = [
-        [InlineKeyboardButton(p.name, callback_data=str(p.id))] for p in playlists
+        [
+            InlineKeyboardButton(
+                f"{emoji_map.get(p.access_type, '📁')} {p.name}",
+                callback_data=str(p.id),
+            )
+        ]
+        for p in playlists
     ]
+
+    await update.message.reply_text(
+        "📂 *Your Playlists*\n"
+        "Each playlist is marked with an emoji to show how you have access:\n\n"
+        "🧺 Your own playlists\n"
+        "🤝 Shared with you\n"
+        "🌍 Publicly accessible\n\n"
+        "🎼 Select a playlist to listen:",
+        reply_markup=InlineKeyboardMarkup(keyboard),
+        parse_mode="Markdown",
+    )
     await update.message.reply_text(
         "Choose a playlist to listen to:",
         reply_markup=InlineKeyboardMarkup(keyboard),
@@ -674,7 +710,7 @@ async def confirm_delete(update: Update, context: CallbackContext):
     songs = await sync_to_async(
         lambda: list(playlist.songs.all().order_by("forwarded_at"))
     )()
-    sleep_time = min(0.3, max(0.1, min(5 / len(sent_songs), 1.5))) if songs else 0
+    sleep_time = min(0.3, max(0.1, min(5 / len(songs), 1.5))) if songs else 0
 
     for song in songs:
         try:
@@ -764,9 +800,23 @@ async def my_playlists(update: Update, context: CallbackContext):
     playlists = await sync_to_async(
         lambda: list(
             Playlist.objects.filter(
-                Q(is_active=True, is_public=True, is_accessible=True)
-                | Q(owner=telegram_user)
-            ).distinct()
+                Q(is_active=True)
+                & (
+                    Q(owner=telegram_user)
+                    | Q(accesses__user=telegram_user)
+                    | Q(is_public=True, is_accessible=True)
+                )
+            )
+            .annotate(
+                access_type=Case(
+                    When(owner=telegram_user, then=Value("owner")),
+                    When(accesses__user=telegram_user, then=Value("shared")),
+                    When(is_public=True, is_accessible=True, then=Value("public")),
+                    default=Value("unknown"),
+                    output_field=CharField(),
+                )
+            )
+            .distinct()
         )
     )()
 
@@ -776,12 +826,30 @@ async def my_playlists(update: Update, context: CallbackContext):
 
     context.user_data["my_playlists"] = {str(p.id): p for p in playlists}
 
+    emoji_map = {
+        "owner": "🧺",
+        "shared": "🤝",
+        "public": "🌍",
+    }
     keyboard = [
-        [InlineKeyboardButton(p.name, callback_data=str(p.id))] for p in playlists
+        [
+            InlineKeyboardButton(
+                f"{emoji_map.get(p.access_type, '📁')} {p.name}",
+                callback_data=str(p.id),
+            )
+        ]
+        for p in playlists
     ]
+
     await update.message.reply_text(
-        "Select a playlist to see more details:",
+        "📂 *Your Playlists*\n"
+        "Each playlist is marked with an emoji to show how you have access:\n\n"
+        "🧺 Your own playlists\n"
+        "🤝 Shared with you\n"
+        "🌍 Publicly accessible\n\n"
+        "👇 Select a playlist to see its details:",
         reply_markup=InlineKeyboardMarkup(keyboard),
+        parse_mode="Markdown",
     )
     return bot.states.SHOW_PLAYLIST_DETAILS
 
@@ -810,9 +878,9 @@ async def show_playlist_details(update: Update, context: CallbackContext):
 
     if update.effective_user.id == owner.telegram_id:
         if playlist.is_public:
-            caption += f"\nChange visibility: /private_{playlist.id}"
+            caption += f"\n👀 Change visibility: /private_{playlist.id}"
         else:
-            caption += f"\nChange visibility: /public_{playlist.id}"
+            caption += f"\n👀 Change visibility: /public_{playlist.id}"
 
     if playlist.cover_message_id:
         try:
