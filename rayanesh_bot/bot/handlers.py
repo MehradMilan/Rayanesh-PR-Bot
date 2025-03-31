@@ -611,8 +611,7 @@ async def listen_music_start(update: Update, context: CallbackContext):
     ]
 
     await update.message.reply_text(
-        "📂 *Your Playlists*\n"
-        "Each playlist is marked with an emoji to show how you have access:\n\n"
+        "📂 *Your Playlists*\n\n"
         "🧺 Your own playlists\n"
         "🤝 Shared with you\n"
         "🌍 Publicly accessible\n\n"
@@ -620,10 +619,7 @@ async def listen_music_start(update: Update, context: CallbackContext):
         reply_markup=InlineKeyboardMarkup(keyboard),
         parse_mode="Markdown",
     )
-    await update.message.reply_text(
-        "Choose a playlist to listen to:",
-        reply_markup=InlineKeyboardMarkup(keyboard),
-    )
+
     return bot.states.LISTEN_CHOOSE_PLAYLIST
 
 
@@ -842,8 +838,7 @@ async def my_playlists(update: Update, context: CallbackContext):
     ]
 
     await update.message.reply_text(
-        "📂 *Your Playlists*\n"
-        "Each playlist is marked with an emoji to show how you have access:\n\n"
+        "📂 *Your Playlists*\n\n"
         "🧺 Your own playlists\n"
         "🤝 Shared with you\n"
         "🌍 Publicly accessible\n\n"
@@ -881,6 +876,9 @@ async def show_playlist_details(update: Update, context: CallbackContext):
             caption += f"\n👀 Change visibility: /private_{playlist.id}"
         else:
             caption += f"\n👀 Change visibility: /public_{playlist.id}"
+        caption += (
+            f"\n📨 Share playlist, 🎧 Listen together: {playlist.share_playlist_uri}"
+        )
 
     if playlist.cover_message_id:
         try:
