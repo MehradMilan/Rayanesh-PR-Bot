@@ -62,7 +62,7 @@ async def share_playlist(telegram_user_id, playlist_id) -> str:
             PlaylistAccess.objects.filter(playlist=playlist, user=telegram_user)
         )
     )()
-    owner = await sync_to_async(playlist.owner)()
+    owner = await db_sync_services.get_playlist_owner(playlist=playlist)
     if not has_access:
         await sync_to_async(PlaylistAccess.objects.create)(
             playlist=playlist,

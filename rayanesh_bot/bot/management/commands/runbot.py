@@ -47,6 +47,12 @@ from bot.handlers import (
     show_playlist_details,
     toggle_playlist_visibility,
     handle_send_to_raya,
+    edit_title,
+    edit_cover,
+    receive_new_cover,
+    receive_new_title,
+    all_songs,
+    remove_song,
     help,
 )
 import bot.commands
@@ -229,6 +235,34 @@ class Command(BaseCommand):
                 filters.Regex(r"^/(public|private)_\d+(?:@\w+)?$"),
                 toggle_playlist_visibility,
             )
+        )
+
+        edit_playlist_handler = ConversationHandler(
+            entry_points=[
+                MessageHandler(
+                    filters.Regex(r"^/edit_title_\d+(?:@\w+)?$"), edit_title
+                ),
+                MessageHandler(
+                    filters.Regex(r"^/edit_cover_\d+(?:@\w+)?$"), edit_cover
+                ),
+            ],
+            states={
+                bot.states.EDIT_TITLE: [
+                    MessageHandler(filters.TEXT & ~filters.COMMAND, receive_new_title)
+                ],
+                bot.states.EDIT_COVER: [
+                    MessageHandler(filters.PHOTO, receive_new_cover)
+                ],
+            },
+            fallbacks=[CommandHandler(bot.commands.CANCEL_COMMAND, cancel)],
+        )
+        application.add_handler(edit_playlist_handler)
+
+        application.add_handler(
+            MessageHandler(filters.Regex(r"^/all_songs_\d+(?:@\w+)?$"), all_songs)
+        )
+        application.add_handler(
+            MessageHandler(filters.Regex(r"^/remove_\d+(?:@\w+)?$"), remove_song)
         )
 
         application.add_handler(CommandHandler(bot.commands.HELP_COMMAND, help))

@@ -23,9 +23,9 @@ def get_args():
 
 
 def send_notifications(message: str, bot: Bot):
-    users = TelegramUser.objects.filter(is_authorized=True).values_list(
-        "telegram_id", flat=True
-    )
+    users = TelegramUser.objects.filter(
+        is_authorized=True, user_type=TelegramUser.MANAGER_USER
+    ).values_list("telegram_id", flat=True)
 
     total = users.count()
     success = 0

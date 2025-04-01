@@ -276,14 +276,16 @@ def check_gate_status():
     current_time = now.time()
     weekday = now.weekday()
 
-    if now.hour == 1:
+    if now.hour in range(1, 8):
         for gate in raya.models.Gate.objects.filter(scannable=True).exclude(
             gate_keepers_group__is_null=True
         ):
             if weekday in [3, 4]:  # Thursday (3), Friday (4)
                 gate.is_active = False
+                logger.info(f"Changed gate {gate} is_active status to False.")
             else:
                 gate.is_active = True
+                logger.info(f"Changed gate {gate} is_active status to True.")
             gate.save()
 
     telegram_bot = reusable.telegram_bots.get_telegram_bot()

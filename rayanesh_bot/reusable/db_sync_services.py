@@ -5,6 +5,7 @@ from telegram import User
 from user.models import TelegramUser, Group, GroupMembership, Task
 from document.models import Document, DocumentGroupAccess, DocumentUserAccess
 from raya.models import Gate
+from music.models import Playlist
 
 
 @sync_to_async
@@ -203,3 +204,8 @@ def activate_gate(gate: Gate) -> None:
     gate.is_active = True
     gate.save()
     return
+
+
+@sync_to_async
+def get_playlist_owner(playlist: Playlist) -> TelegramUser:
+    return playlist.owner

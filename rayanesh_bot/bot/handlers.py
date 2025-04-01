@@ -678,12 +678,13 @@ async def confirm_delete(update: Update, context: CallbackContext):
 
     playlist = await sync_to_async(lambda: Playlist.objects.get(id=playlist_id))()
     song_count = await sync_to_async(lambda: playlist.songs.count())()
+    owner = await db_sync_services.get_playlist_owner(playlist=playlist)
 
     if playlist.cover_message_id:
         try:
             caption_text = persian.PLAYLIST_COVER_CAPTION.format(
                 name=playlist.name,
-                username=telegram_user.username,
+                username=owner.username,
                 count=song_count,
                 created_at=playlist.created_at.strftime("%Y-%m-%d"),
                 description=playlist.description or "No description.",
@@ -877,6 +878,9 @@ async def show_playlist_details(update: Update, context: CallbackContext):
         else:
             caption += f"\n👀 Change visibility: /public_{playlist.id}"
         caption += (
+            f"\n📝 Edit title: /edit_title_{playlist.id}"
+            f"\n🖼️ Edit cover: /edit_cover_{playlist.id}"
+            f"\n🎶 View all songs: /all_songs_{playlist.id}"
             f"\n📨 Share playlist, 🎧 Listen together: {playlist.share_playlist_uri}"
         )
 
@@ -937,6 +941,184 @@ async def check_private_and_authorized(update: Update, context: CallbackContext)
 
     context.user_data["telegram_user"] = telegram_user
     return None
+
+
+async def edit_title(update: Update, context: CallbackContext):
+    check = await check_private_and_authorized(update, context)
+    if check is not None:
+        return check
+
+    telegram_user = context.user_data["telegram_user"]
+    text = update.message.text
+
+    match = re.match(r"/edit_title_(\d+)(?:@\w+)?", text)
+    if not match:
+        await update.message.reply_text("❌ Invalid command format.")
+        return ConversationHandler.END
+
+    playlist_id = int(match.group(1))
+    playlist = await sync_to_async(
+        lambda: Playlist.objects.filter(id=playlist_id, owner=telegram_user).first()
+    )()
+    if not playlist:
+        await update.message.reply_text("⚠️ Playlist not found or not owned by you.")
+        return ConversationHandler.END
+
+    context.user_data["playlist_to_edit"] = playlist
+    await update.message.reply_text("📝 Send the new title for your playlist:")
+    return bot.states.EDIT_TITLE
+
+
+async def receive_new_title(update: Update, context: CallbackContext):
+    playlist = context.user_data["playlist_to_edit"]
+    new_title = update.message.text.strip()
+
+    playlist.name = new_title
+    await sync_to_async(playlist.save)()
+
+    await update.message.reply_text(
+        f"✅ Playlist title updated to: *{new_title}*", parse_mode="Markdown"
+    )
+    return ConversationHandler.END
+
+
+async def edit_cover(update: Update, context: CallbackContext):
+    check = await check_private_and_authorized(update, context)
+    if check is not None:
+        return check
+
+    telegram_user = context.user_data["telegram_user"]
+    text = update.message.text
+
+    match = re.match(r"/edit_cover_(\d+)(?:@\w+)?", text)
+    if not match:
+        await update.message.reply_text("❌ Invalid command format.")
+        return ConversationHandler.END
+
+    playlist_id = int(match.group(1))
+    playlist: Playlist = await sync_to_async(
+        lambda: Playlist.objects.filter(id=playlist_id, owner=telegram_user).first()
+    )()
+    if not playlist:
+        await update.message.reply_text("⚠️ Playlist not found or not owned by you.")
+        return ConversationHandler.END
+
+    context.user_data["playlist_to_edit"] = playlist
+    await update.message.reply_text("🖼️ Send a new photo to use as the cover:")
+    return bot.states.EDIT_COVER
+
+
+async def receive_new_cover(update: Update, context: CallbackContext):
+    playlist: Playlist = context.user_data["playlist_to_edit"]
+    new_photo = update.message.photo
+
+    if not new_photo:
+        await update.message.reply_text("❗Please send a valid photo.")
+        return bot.states.EDIT_COVER
+
+    if playlist.cover_message_id:
+        try:
+            await update.bot.delete_message(
+                chat_id=settings.MUSIC_CHANNEL_CHAT_ID,
+                message_id=int(playlist.cover_message_id),
+            )
+        except Exception as e:
+            logger.error(f"Failed to delete old cover: {e}")
+
+    sent = await update.bot.copy_message(
+        chat_id=settings.MUSIC_CHANNEL_CHAT_ID,
+        from_chat_id=update.effective_chat.id,
+        message_id=update.message.message_id,
+    )
+
+    playlist.cover_message_id = str(sent.message_id)
+    await sync_to_async(playlist.save)()
+
+    await update.message.reply_text("✅ Playlist cover updated successfully.")
+    return ConversationHandler.END
+
+
+async def all_songs(update: Update, context: CallbackContext):
+    check = await check_private_and_authorized(update, context)
+    if check is not None:
+        return
+
+    telegram_user = context.user_data["telegram_user"]
+    text = update.message.text
+
+    match = re.match(r"/all_songs_(\d+)", text)
+    if not match:
+        await update.message.reply_text("❌ Invalid command format.")
+        return
+
+    playlist_id = int(match.group(1))
+    playlist = await sync_to_async(
+        lambda: Playlist.objects.filter(id=playlist_id, owner=telegram_user).first()
+    )()
+
+    if not playlist:
+        await update.message.reply_text("⚠️ Playlist not found or not owned by you.")
+        return
+
+    songs = await sync_to_async(lambda: playlist.songs.all())()
+
+    if not songs:
+        await update.message.reply_text("There are no songs in this playlist.")
+        return
+
+    song_list = "\n".join(
+        [
+            f"{index + 1}. {song.name} - /remove_{song.id}"
+            for index, song in enumerate(songs)
+        ]
+    )
+
+    await update.message.reply_text(
+        f'🎶 Song List for Playlist "{playlist.name}":\n{song_list}',
+    )
+    return
+
+
+async def remove_song(update: Update, context: CallbackContext):
+    check = await check_private_and_authorized(update, context)
+    if check is not None:
+        return
+
+    telegram_user = context.user_data["telegram_user"]
+    text = update.message.text
+
+    match = re.match(r"/remove_(\d+)(?:@\w+)?", text)
+    if not match:
+        await update.message.reply_text("❌ Invalid command format.")
+        return
+
+    song_id = int(match.group(1))
+    song: Song = await sync_to_async(lambda: Song.objects.filter(id=song_id).first())()
+
+    if not song:
+        await update.message.reply_text("⚠️ Song not found.")
+        return
+
+    playlist = await sync_to_async(lambda: song.playlists.first())()
+    owner = await sync_to_async(lambda: playlist.owner)()
+    if owner != telegram_user:
+        await update.message.reply_text(
+            "❌ You don't have permission to remove this song."
+        )
+        return
+
+    await sync_to_async(lambda: playlist.songs.remove(song))()
+    await sync_to_async(lambda: song.delete())()
+
+    try:
+        await context.bot.delete_message(
+            chat_id=settings.MUSIC_CHANNEL_CHAT_ID,
+            message_id=int(song.channel_message_id),
+        )
+    except Exception as e:
+        logger.error(f"Failed to delete message from channel: {e}")
+
+    await update.message.reply_text(f"✅ Song *{song.name}* has been removed.")
 
 
 async def cancel(update: Update, context: CallbackContext) -> int:
