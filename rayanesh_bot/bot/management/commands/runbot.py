@@ -53,6 +53,10 @@ from bot.handlers import (
     receive_new_title,
     all_songs,
     remove_song,
+    batch_send_music_start,
+    receive_batch_music,
+    done_batch_forward,
+    choose_batch_playlist,
     help,
 )
 import bot.commands
@@ -77,6 +81,10 @@ class Command(BaseCommand):
                 (bot.commands.LISTEN_MUSIC_COMMAND, "موسیقی بشنویم!"),
                 (bot.commands.MY_PLAYLISTS_COMMAND, "تمام پلی‌لیست‌ها"),
                 (bot.commands.CREATE_PLAYLIST_COMMAND, "پلی‌لیست خودتو بساز!"),
+                (
+                    bot.commands.BATCH_SEND_MUSIC_COMMAND,
+                    "تعدادی آهنگ رو همزمان به پلی‌لیستت اضافه کن!",
+                ),
             ]
         )
 
@@ -264,6 +272,30 @@ class Command(BaseCommand):
         application.add_handler(
             MessageHandler(filters.Regex(r"^/remove_\d+(?:@\w+)?$"), remove_song)
         )
+
+        batch_send_music_handler = ConversationHandler(
+            entry_points=[
+                CommandHandler(
+                    bot.commands.BATCH_SEND_MUSIC_COMMAND, batch_send_music_start
+                )
+            ],
+            states={
+                bot.states.BATCH_CHOOSE_PLAYLIST: [
+                    CallbackQueryHandler(choose_batch_playlist)
+                ],
+                bot.states.BATCH_RECEIVE_MUSIC: [
+                    MessageHandler(filters.AUDIO, receive_batch_music),
+                ],
+            },
+            fallbacks=[
+                CommandHandler(
+                    bot.commands.DONE_BATCH_FORWARD_COMMMAND, done_batch_forward
+                ),
+                CommandHandler(bot.commands.CANCEL_COMMAND, cancel),
+            ],
+        )
+
+        application.add_handler(batch_send_music_handler)
 
         application.add_handler(CommandHandler(bot.commands.HELP_COMMAND, help))
 

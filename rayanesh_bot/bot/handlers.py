@@ -497,7 +497,7 @@ async def receive_music(update: Update, context: CallbackContext):
     title, artist = bot.tasks.get_audio_title_and_artist(file_bytes)
     context.user_data["artist"] = artist
     context.user_data["file_message"] = message
-    if title is not None:
+    if title is None:
         await update.message.reply_text("What name should I give this track?")
         return bot.states.ENTER_NAME
     context.user_data["song_name"] = title
@@ -1145,6 +1145,134 @@ async def remove_song(update: Update, context: CallbackContext):
         logger.error(f"Failed to delete message from channel: {e}")
 
     await update.message.reply_text(f"✅ Song *{song.name}* has been removed.")
+
+
+async def batch_send_music_start(update: Update, context: CallbackContext):
+    check = await check_private_and_authorized(update, context)
+    if check is not None:
+        return check
+    telegram_user = context.user_data["telegram_user"]
+
+    playlists = await sync_to_async(
+        lambda: list(
+            Playlist.objects.filter(
+                Q(is_active=True) & Q(owner=telegram_user)
+            ).distinct()
+        )
+    )()
+    if not playlists:
+        await update.message.reply_text("There are no playlists available.")
+        return ConversationHandler.END
+
+    keyboard = [
+        [InlineKeyboardButton(p.name, callback_data=str(p.id))] for p in playlists
+    ]
+    await update.message.reply_text(
+        "Choose a playlist to add your music to:",
+        reply_markup=InlineKeyboardMarkup(keyboard),
+    )
+    return bot.states.BATCH_CHOOSE_PLAYLIST
+
+
+async def choose_batch_playlist(update: Update, context: CallbackContext):
+    query = update.callback_query
+    await query.answer()
+
+    playlist_id = int(query.data)
+    context.user_data["batch_playlist_id"] = playlist_id
+
+    await query.message.reply_text(
+        "You can now send multiple music files. Type /done_batch_forward when done."
+    )
+    context.user_data["batch_files"] = []
+
+    return bot.states.BATCH_RECEIVE_MUSIC
+
+
+async def receive_batch_music(update: Update, context: CallbackContext):
+    message = update.message
+    audio = message.audio
+
+    if not audio:
+        await update.message.reply_text("❗ Please send a valid music file.")
+        return bot.states.BATCH_RECEIVE_MUSIC
+
+    context.user_data["batch_files"].append(message)
+
+    return bot.states.BATCH_RECEIVE_MUSIC
+
+
+async def done_batch_forward(update: Update, context: CallbackContext):
+    check = await check_private_and_authorized(update, context)
+    if check is not None:
+        return check
+    telegram_user = context.user_data["telegram_user"]
+
+    playlist_id = context.user_data["batch_playlist_id"]
+    if playlist_id is None:
+        update.message.reply_text("❗ No Playlist is selected!")
+        return ConversationHandler.END
+    playlist = await sync_to_async(lambda: Playlist.objects.get(id=playlist_id))()
+
+    batch_files = context.user_data["batch_files"] or []
+    failed_files = []
+
+    for file_message in batch_files:
+        try:
+            telegram_file = await context.bot.get_file(file_message.audio.file_id)
+            file_bytes = await telegram_file.download_as_bytearray()
+            file_bytes = BytesIO(file_bytes)
+            song_name, artist = bot.tasks.get_audio_title_and_artist(file_bytes)
+            if song_name is None:
+                failed_files.append(file_message)
+                continue
+
+            caption = f"🎵 {song_name}\n💫 Added by {telegram_user.username or telegram_user.name}"
+
+            forwarded = await context.bot.copy_message(
+                chat_id=settings.MUSIC_CHANNEL_CHAT_ID,
+                from_chat_id=telegram_user.telegram_id,
+                message_id=file_message.message_id,
+                caption=caption,
+            )
+            try:
+                await context.bot.delete_message(
+                    chat_id=telegram_user.telegram_id,
+                    message_id=file_message.message_id,
+                )
+            except Exception as e:
+                logger.error(f"Failed to delete original file.")
+
+            await sync_to_async(
+                lambda: playlist.songs.add(
+                    Song.objects.create(
+                        name=song_name,
+                        channel_message_id=str(forwarded.message_id),
+                        added_by=telegram_user,
+                        caption=caption,
+                        artist=artist,
+                    )
+                )
+            )()
+
+        except Exception as e:
+            logger.error(f"Failed to process {file_message.message_id}: {e}")
+            failed_files.append(file_message)
+
+    if failed_files:
+        failed_count = len(failed_files)
+        await update.message.reply_text(
+            f"❌ {failed_count} song(s) failed to add. Try sending those individually."
+        )
+    else:
+        await update.message.reply_text(
+            "✅ All songs were successfully added to the playlist!"
+        )
+
+    context.user_data["batch_files"] = []
+    context.user_data["batch_playlist_id"] = None
+
+    return ConversationHandler.END
 
 
 async def cancel(update: Update, context: CallbackContext) -> int:

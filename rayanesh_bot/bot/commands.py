@@ -13,6 +13,8 @@ SEND_MUSIC_COMMAND = "send_music"
 CREATE_PLAYLIST_COMMAND = "create_playlist"
 MY_PLAYLISTS_COMMAND = "my_playlists"
 SHARE_PLAYLIST_COMMAND = "share_playlist"
+BATCH_SEND_MUSIC_COMMAND = "batch_send_music"
+DONE_BATCH_FORWARD_COMMMAND = "done_batch_forward"
 
 DEEPLINK_HANDLERS = {
     JOIN_GROUP_COMMAND: join_group_request,
