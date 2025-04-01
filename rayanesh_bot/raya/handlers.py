@@ -461,10 +461,10 @@ async def send_notification_start(update: Update, context: CallbackContext):
     check = await check_private_and_manager(update, context)
     if check is not None:
         return check
-    groups = await sync_to_async(lambda: Group.objects.filter(is_active=True))()
+    groups = await sync_to_async(lambda: list(Group.objects.filter(is_active=True)))()
 
     keyboard = [
-        [InlineKeyboardButton(group.name, callback_data=f"send_to_group_{group.id}")]
+        [InlineKeyboardButton(group.title, callback_data=f"send_to_group_{group.id}")]
         for group in groups
     ]
 
@@ -486,7 +486,7 @@ async def select_group(update: Update, context: CallbackContext):
     selected_target = query.data
 
     if selected_target != "send_to_all_users":
-        group_id = int(selected_target.split("_")[2])
+        group_id = int(selected_target.split("_")[3])
         group = await sync_to_async(lambda: Group.objects.get(id=group_id))()
         context.user_data["group"] = group
         context.user_data["is_general"] = False
@@ -505,7 +505,7 @@ async def receive_notification_message(update: Update, context: CallbackContext)
     group = context.user_data.get("group")
     is_general = context.user_data["is_general"]
 
-    forwarded_message = await context.bot.forward_message(
+    forwarded_message = await context.bot.copy_message(
         chat_id=settings.HEALTHCHECK_CHAT_ID,
         from_chat_id=update.effective_chat.id,
         message_id=message.message_id,
@@ -524,41 +524,39 @@ async def receive_notification_message(update: Update, context: CallbackContext)
 
     await update.message.reply_text(
         "Please enter the time to send the notification (e.g., '2025-04-20 15:30')."
-        f"⏳ Now: {timezone.now()}"
+        f"⏳ Now: {timezone.localtime(timezone.now()).date() - timezone.localtime(timezone.now()).time()}"
     )
     return raya.states.RECEIVE_SCHEDULE_TIME
 
 
 async def receive_schedule_time(update: Update, context: CallbackContext):
     try:
-        scheduled_time = parse(update.message.text)
-        if scheduled_time < timezone.now():
-            await update.message.reply_text(
-                "❗ You cannot schedule a notification in the past."
-            )
-            return raya.states.RECEIVE_SCHEDULE_TIME
-
-        context.user_data["scheduled_time"] = scheduled_time
-
-        await update.message.reply_text(
-            f"Notification scheduled for {scheduled_time.strftime('%Y-%m-%d %H:%M:%S')}. Do you confirm?",
-            reply_markup=InlineKeyboardMarkup(
-                [
-                    [
-                        InlineKeyboardButton(
-                            "✅ Confirm", callback_data="confirm_schedule"
-                        ),
-                        InlineKeyboardButton(
-                            "❌ Cancel", callback_data="cancel_schedule"
-                        ),
-                    ]
-                ]
-            ),
-        )
-        return raya.states.CONFIRM_SCHEDULE
+        scheduled_time, _ = parse(update.message.text, fuzzy_with_tokens=True)
     except Exception as e:
         await update.message.reply_text("❗ Invalid time format. Please try again.")
         return raya.states.RECEIVE_SCHEDULE_TIME
+    if scheduled_time < timezone.localtime(timezone.now()):
+        await update.message.reply_text(
+            "❗ You cannot schedule a notification in the past."
+        )
+        return raya.states.RECEIVE_SCHEDULE_TIME
+
+    context.user_data["scheduled_time"] = scheduled_time
+
+    await update.message.reply_text(
+        f"Notification scheduled for {scheduled_time.strftime('%Y-%m-%d %H:%M:%S')}. Do you confirm?",
+        reply_markup=InlineKeyboardMarkup(
+            [
+                [
+                    InlineKeyboardButton(
+                        "✅ Confirm", callback_data="confirm_schedule"
+                    ),
+                    InlineKeyboardButton("❌ Cancel", callback_data="cancel_schedule"),
+                ]
+            ]
+        ),
+    )
+    return raya.states.CONFIRM_SCHEDULE
 
 
 async def confirm_schedule(update: Update, context: CallbackContext):
