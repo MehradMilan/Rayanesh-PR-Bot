@@ -35,7 +35,6 @@ class NotificationAdmin(admin.ModelAdmin):
         "message_id",
         "source_channel_id",
         "group",
-        "created_at",
         "propagated_at",
         "is_general",
     )
@@ -48,10 +47,8 @@ class NotificationAdmin(admin.ModelAdmin):
         "source_channel_id",
         "group",
         "is_general",
-        "created_at",
         "propagated_at",
     )
-    actions = ["mark_as_sent"]
 
 
 admin.site.register(Notification, NotificationAdmin)

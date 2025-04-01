@@ -5,6 +5,7 @@ import typing
 import re
 from asgiref.sync import sync_to_async
 from dateutil.parser import parse
+import pytz
 
 from django.utils import timezone
 from django.conf import settings
@@ -524,7 +525,7 @@ async def receive_notification_message(update: Update, context: CallbackContext)
 
     await update.message.reply_text(
         "Please enter the time to send the notification (e.g., '2025-04-20 15:30')."
-        f"⏳ Now: {timezone.localtime(timezone.now()).date() - timezone.localtime(timezone.now()).time()}"
+        f"⏳ Now: {timezone.localtime(timezone.now())}"
     )
     return raya.states.RECEIVE_SCHEDULE_TIME
 
@@ -535,6 +536,9 @@ async def receive_schedule_time(update: Update, context: CallbackContext):
     except Exception as e:
         await update.message.reply_text("❗ Invalid time format. Please try again.")
         return raya.states.RECEIVE_SCHEDULE_TIME
+    tehran_timezone = pytz.timezone("Asia/Tehran")
+    if scheduled_time.tzinfo is None:
+        scheduled_time = tehran_timezone.localize(scheduled_time)
     if scheduled_time < timezone.localtime(timezone.now()):
         await update.message.reply_text(
             "❗ You cannot schedule a notification in the past."
