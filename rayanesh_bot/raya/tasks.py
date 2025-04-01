@@ -353,7 +353,7 @@ def send_notification_task(notification_id):
     bot = reusable.telegram_bots.get_telegram_bot()
     for user_id in target_ids:
         try:
-            asyncio.to_thread(forward_notification_message, bot, notification, user_id)
+            asyncio.run(forward_notification_message, bot, notification, user_id)
             time.sleep(0.5)
         except Exception as e:
             logger.error(f"Sending notification to user {user_id} failed: {e}")

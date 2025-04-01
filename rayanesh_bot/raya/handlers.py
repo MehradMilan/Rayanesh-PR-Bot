@@ -524,7 +524,7 @@ async def receive_notification_message(update: Update, context: CallbackContext)
     context.user_data["notification_id"] = notification.id
 
     await update.message.reply_text(
-        "Please enter the time to send the notification (e.g., '2025-04-20 15:30')."
+        "Please enter the time to send the notification (e.g., '2025-04-20 15:30').\n"
         f"⏳ Now: {timezone.localtime(timezone.now())}"
     )
     return raya.states.RECEIVE_SCHEDULE_TIME
@@ -564,6 +564,9 @@ async def receive_schedule_time(update: Update, context: CallbackContext):
 
 
 async def confirm_schedule(update: Update, context: CallbackContext):
+    query = update.callback_query
+    await query.answer()
+
     notification_id = context.user_data["notification_id"]
     scheduled_time = context.user_data["scheduled_time"]
 
@@ -571,7 +574,15 @@ async def confirm_schedule(update: Update, context: CallbackContext):
         args=[notification_id], eta=scheduled_time
     )
 
-    await update.message.reply_text(f"✅ Notification scheduled for {scheduled_time}.")
+    await query.message.reply_text(f"✅ Notification scheduled for {scheduled_time}.")
+    return ConversationHandler.END
+
+
+async def cancel_schedule(update: Update, context: CallbackContext):
+    query = update.callback_query
+    await query.answer()
+
+    await query.message.reply_text(f"❌ Notification canceled.")
     return ConversationHandler.END
 
 

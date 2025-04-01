@@ -32,6 +32,7 @@ from raya.handlers import (
     receive_schedule_time,
     send_notification_start,
     receive_notification_message,
+    cancel_schedule,
     cancel,
 )
 import raya.commands
@@ -161,7 +162,7 @@ class Command(BaseCommand):
                     CallbackQueryHandler(
                         confirm_schedule, pattern=r"^confirm_schedule$"
                     ),
-                    CallbackQueryHandler(cancel, pattern=r"^cancel_schedule$"),
+                    CallbackQueryHandler(cancel_schedule, pattern=r"^cancel_schedule$"),
                 ],
             },
             fallbacks=[CommandHandler(raya.commands.CANCEL_COMMAND, cancel)],
