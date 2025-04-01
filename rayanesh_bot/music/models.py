@@ -6,6 +6,7 @@ from user.models import TelegramUser
 
 class Song(models.Model):
     name = models.CharField(max_length=255, blank=True)
+    artist = models.CharField(max_length=255, blank=True, null=True)
     channel_message_id = models.CharField(max_length=63)
     added_by = models.ForeignKey(TelegramUser, on_delete=models.SET_NULL, null=True)
     caption = models.TextField(blank=True)

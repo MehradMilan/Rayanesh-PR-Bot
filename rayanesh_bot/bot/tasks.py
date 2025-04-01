@@ -2,6 +2,8 @@ import typing
 from datetime import timedelta
 import math
 from asgiref.sync import sync_to_async
+from mutagen import File
+from io import BytesIO
 
 import celery
 from celery.schedules import crontab
@@ -225,3 +227,10 @@ def calculate_weight(task_count, base=2, max_weight=10):
         return max_weight
     weight = max_weight / (1 + math.log(task_count + 1, base))
     return weight
+
+
+def get_audio_title_and_artist(file_bytes: BytesIO):
+    audio = File(file_bytes)
+    if audio and "TIT2" in audio:
+        return str(audio["TIT2"]), audio.get("TPE1", "Unknown")
+    return None, "Unknown"

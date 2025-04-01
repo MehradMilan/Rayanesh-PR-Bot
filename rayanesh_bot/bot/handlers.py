@@ -6,11 +6,13 @@ from datetime import timedelta
 from asgiref.sync import sync_to_async
 import typing
 import asyncio
+from io import BytesIO
 
 from django.conf import settings
 from django.utils import timezone
 from django.db.models import Case, When, IntegerField, Value, Q, CharField
 
+import bot.tasks
 from user.models import TelegramUser, Group, Task
 from music.models import Song, Playlist, SentSong
 from raya.models import Gate
@@ -477,32 +479,46 @@ async def choose_playlist(update: Update, context: CallbackContext):
     playlist_id = int(query.data)
     context.user_data["playlist_id"] = playlist_id
 
-    await query.message.reply_text("Send me the music file now (as audio or document).")
+    await query.message.reply_text("Send me the music file now as audio.")
     return bot.states.SEND_MUSIC
 
 
 async def receive_music(update: Update, context: CallbackContext):
     message = update.message
-    audio = message.audio or message.document
+    audio = message.audio
 
     if not audio:
         await update.message.reply_text("Please send a music file.")
         return bot.states.SEND_MUSIC
 
+    telegram_file = await context.bot.get_file(audio.file_id)
+    file_bytes = await telegram_file.download_as_bytearray()
+    file_bytes = BytesIO(file_bytes)
+    title, artist = bot.tasks.get_audio_title_and_artist(file_bytes)
+    context.user_data["artist"] = artist
     context.user_data["file_message"] = message
-    await update.message.reply_text("What name should I give this track?")
-    return bot.states.ENTER_NAME
+    if title is not None:
+        await update.message.reply_text("What name should I give this track?")
+        return bot.states.ENTER_NAME
+    context.user_data["song_name"] = title
+    return await forward_to_save_music(update=update, context=context)
 
 
 async def receive_name(update: Update, context: CallbackContext):
+    song_name = update.message.text
+    context.user_data["song_name"] = song_name
+    return await forward_to_save_music(update=update, context=context)
+
+
+async def forward_to_save_music(update: Update, context: CallbackContext):
     user = update.effective_user
     telegram_user = await db_sync_services.get_telegram_user_by_id(telegram_id=user.id)
-
-    song_name = update.message.text
+    original_message = context.user_data["file_message"]
     playlist_id = context.user_data["playlist_id"]
     playlist = await sync_to_async(lambda: Playlist.objects.get(id=playlist_id))()
+    song_name = context.user_data["song_name"]
+    artist = context.user_data["artist"]
 
-    original_message = context.user_data["file_message"]
     caption = f"🎵 {song_name}\n💫 Sent by {telegram_user.username or telegram_user.name}\n\n◾ @{settings.RAYANESH_CHANNEL_ID}"
 
     try:
@@ -531,6 +547,7 @@ async def receive_name(update: Update, context: CallbackContext):
                 channel_message_id=str(forwarded.message_id),
                 added_by=telegram_user,
                 caption=caption,
+                artist=artist,
             )
         )
     )()
