@@ -927,12 +927,12 @@ async def check_private_and_authorized(update: Update, context: CallbackContext)
     user = update.effective_user
 
     if chat.type.upper() != "PRIVATE":
-        await update.message.reply_text("⚠️ Please use this bot in a private chat.")
+        await update.message.reply_text("⚠️ Please use this command in a private chat.")
         return ConversationHandler.END
 
     telegram_user = await db_sync_services.get_telegram_user_by_id(telegram_id=user.id)
     if telegram_user is None or not telegram_user.is_authorized:
-        await update.message.reply_text("🚫 You are not authorized to use this bot.")
+        await update.message.reply_text("🚫 You are not authorized yet. Use /authorize")
         return ConversationHandler.END
 
     context.user_data["telegram_user"] = telegram_user

@@ -58,15 +58,16 @@ async def share_playlist(telegram_user_id, playlist_id) -> str:
         telegram_user_id
     )
     has_access = await sync_to_async(
-        list(
-            lambda: PlaylistAccess.objects.filter(playlist=playlist, user=telegram_user)
+        lambda: list(
+            PlaylistAccess.objects.filter(playlist=playlist, user=telegram_user)
         )
     )()
+    owner = await sync_to_async(playlist.owner)()
     if not has_access:
         await sync_to_async(PlaylistAccess.objects.create)(
             playlist=playlist,
             user=telegram_user,
-            shared_by=playlist.owner,
+            shared_by=owner,
         )
 
     return f"✅ You now have access to playlist: {playlist.name}"
