@@ -503,18 +503,26 @@ async def receive_name(update: Update, context: CallbackContext):
     playlist = await sync_to_async(lambda: Playlist.objects.get(id=playlist_id))()
 
     original_message = context.user_data["file_message"]
-    forwarded = await original_message.forward(chat_id=settings.MUSIC_CHANNEL_CHAT_ID)
-
     caption = f"🎵 {song_name}\n💫 Sent by {telegram_user.username or telegram_user.name}\n\n◾ @{settings.RAYANESH_CHANNEL_ID}"
 
     try:
-        await context.bot.edit_message_caption(
+        forwarded = await context.bot.copy_message(
             chat_id=settings.MUSIC_CHANNEL_CHAT_ID,
-            message_id=forwarded.message_id,
+            from_chat_id=user.id,
+            message_id=int(original_message.message_id),
             caption=caption,
         )
-    except Exception:
-        pass
+    except Exception as e:
+        logger.error(f"Failed to save music: {e}")
+        return ConversationHandler.END
+
+    try:
+        await context.bot.delete_message(
+            chat_id=user.id,
+            message_id=original_message.message_id,
+        )
+    except Exception as e:
+        logger.error(f"Failed to delete original file.")
 
     await sync_to_async(
         lambda: playlist.songs.add(
@@ -535,7 +543,8 @@ async def receive_name(update: Update, context: CallbackContext):
         ]
     ]
     await update.message.reply_text(
-        "✅ Your music has been added to the playlist!\n\n"
+        "✅ Your music has been added to the playlist!\n"
+        "🥷 Original message was deleted for better Experience.\n\n"
         "Do you want to send this track to رایاموزیک?",
         reply_markup=InlineKeyboardMarkup(keyboard),
     )
@@ -881,7 +890,7 @@ async def show_playlist_details(update: Update, context: CallbackContext):
             f"\n📝 Edit title: /edit_title_{playlist.id}"
             f"\n🖼️ Edit cover: /edit_cover_{playlist.id}"
             f"\n🎶 View all songs: /all_songs_{playlist.id}"
-            f"\n📨 Share playlist, 🎧 Listen together: {playlist.share_playlist_uri}"
+            f"\n\n📨 Share playlist, 🎧 Listen together: {playlist.share_playlist_uri}"
         )
 
     if playlist.cover_message_id:
@@ -1018,14 +1027,14 @@ async def receive_new_cover(update: Update, context: CallbackContext):
 
     if playlist.cover_message_id:
         try:
-            await update.bot.delete_message(
+            await context.bot.delete_message(
                 chat_id=settings.MUSIC_CHANNEL_CHAT_ID,
                 message_id=int(playlist.cover_message_id),
             )
         except Exception as e:
             logger.error(f"Failed to delete old cover: {e}")
 
-    sent = await update.bot.copy_message(
+    sent = await context.bot.copy_message(
         chat_id=settings.MUSIC_CHANNEL_CHAT_ID,
         from_chat_id=update.effective_chat.id,
         message_id=update.message.message_id,
@@ -1060,7 +1069,7 @@ async def all_songs(update: Update, context: CallbackContext):
         await update.message.reply_text("⚠️ Playlist not found or not owned by you.")
         return
 
-    songs = await sync_to_async(lambda: playlist.songs.all())()
+    songs = await sync_to_async(lambda: list(playlist.songs.all()))()
 
     if not songs:
         await update.message.reply_text("There are no songs in this playlist.")
