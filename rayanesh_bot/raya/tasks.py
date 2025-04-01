@@ -1,17 +1,24 @@
 import typing
-from datetime import datetime
 import os
 import subprocess
 from pathlib import Path
 from asgiref.sync import sync_to_async
 import pytz
+from telegram.error import TelegramError
+import asyncio
+import time
 
 from django.conf import settings
 import celery
 from celery.schedules import crontab
 from celery.utils.log import get_task_logger
-from core.celery import DB_POSTGRES_BACKUP_QUEUE, GATEKEEPERS_QUEUE, app as celery_app
 from django.utils import timezone
+from core.celery import (
+    DB_POSTGRES_BACKUP_QUEUE,
+    GATEKEEPERS_QUEUE,
+    NOTIFICATION_QUEUE,
+    app as celery_app,
+)
 
 import reusable.db_sync_services as db_sync_services
 from user.models import TelegramUser, Group, GroupMembership
@@ -222,7 +229,7 @@ def backup_postgres_database():
     Performs a PostgreSQL database backup and sends it to a Telegram bot.
     Uses safe subprocess practices and handles errors cleanly.
     """
-    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    timestamp = timezone.now().strftime("%Y-%m-%d_%H-%M-%S")
     backup_filename = f"db_backup_{timestamp}.sql"
     backup_dir = Path(settings.BACKUP_DIR)
     backup_dir.mkdir(parents=True, exist_ok=True)
@@ -322,3 +329,46 @@ def check_gate_status():
             logger.info(
                 f"Reminded to close the door in Gatekeepers at {now.hour} O'clock."
             )
+
+
+@celery.shared_task(name="send_notification_task", queue=NOTIFICATION_QUEUE)
+def send_notification_task(notification_id):
+    notification = raya.models.Notification.objects.get(id=notification_id)
+
+    if notification.is_general:
+        target_ids = TelegramUser.objects.all().values_list("telegram_id", flat=True)
+    else:
+        if notification.group:
+            target_ids = (
+                TelegramUser.objects.filter(
+                    groupmembership__group=notification.group,
+                    groupmembership__is_approved=True,
+                )
+                .distinct()
+                .values_list("telegram_id", flat=True)
+            )
+        else:
+            target_ids = []
+
+    bot = reusable.telegram_bots.get_telegram_bot()
+    for user_id in target_ids:
+        try:
+            asyncio.to_thread(forward_notification_message, bot, notification, user_id)
+            time.sleep(0.5)
+        except Exception as e:
+            logger.error(f"Sending notification to user {user_id} failed: {e}")
+            continue
+
+    notification.propagated_at = timezone.now()
+    notification.save()
+
+
+async def forward_notification_message(bot, notification, user_id):
+    try:
+        await bot.copy_message(
+            chat_id=user_id,
+            from_chat_id=notification.source_channel_id,
+            message_id=notification.message_id,
+        )
+    except TelegramError as e:
+        logger.error(f"Failed to send notification to {user_id}: {e}")

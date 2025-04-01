@@ -4,8 +4,10 @@ from telegram.ext import CallbackContext, ConversationHandler
 import typing
 import re
 from asgiref.sync import sync_to_async
+from dateutil.parser import parse
 
 from django.utils import timezone
+from django.conf import settings
 
 import reusable.db_sync_services
 from user.models import TelegramUser, GroupMembership, Group
@@ -21,6 +23,7 @@ import reusable.telegram_bots
 import raya.states
 import raya.services
 import raya.tasks
+from raya.models import Notification
 
 logger = logging.getLogger(__name__)
 
@@ -454,6 +457,146 @@ async def remove_user(update: Update, context: CallbackContext) -> int:
     return ConversationHandler.END
 
 
+async def send_notification_start(update: Update, context: CallbackContext):
+    check = await check_private_and_manager(update, context)
+    if check is not None:
+        return check
+    groups = await sync_to_async(lambda: Group.objects.filter(is_active=True))()
+
+    keyboard = [
+        [InlineKeyboardButton(group.name, callback_data=f"send_to_group_{group.id}")]
+        for group in groups
+    ]
+
+    keyboard.append(
+        [InlineKeyboardButton("🌬 All users", callback_data="send_to_all_users")]
+    )
+
+    await update.message.reply_text(
+        "Select the group to send the notification.",
+        reply_markup=InlineKeyboardMarkup(keyboard),
+    )
+    return raya.states.SELECT_GROUP
+
+
+async def select_group(update: Update, context: CallbackContext):
+    query = update.callback_query
+    await query.answer()
+
+    selected_target = query.data
+
+    if selected_target != "send_to_all_users":
+        group_id = int(selected_target.split("_")[2])
+        group = await sync_to_async(lambda: Group.objects.get(id=group_id))()
+        context.user_data["group"] = group
+        context.user_data["is_general"] = False
+    else:
+        context.user_data["group"] = None
+        context.user_data["is_general"] = True
+
+    await query.message.reply_text(
+        "Now, send the notification message (text, photo, etc.)."
+    )
+    return raya.states.RECEIVE_NOTIFICATION_MESSAGE
+
+
+async def receive_notification_message(update: Update, context: CallbackContext):
+    message = update.message
+    group = context.user_data.get("group")
+    is_general = context.user_data["is_general"]
+
+    forwarded_message = await context.bot.forward_message(
+        chat_id=settings.HEALTHCHECK_CHAT_ID,
+        from_chat_id=update.effective_chat.id,
+        message_id=message.message_id,
+    )
+
+    notification = await sync_to_async(
+        lambda: Notification.objects.create(
+            message_id=str(forwarded_message.message_id),
+            source_channel_id=settings.HEALTHCHECK_CHAT_ID,
+            group=group,
+            is_general=is_general,
+        )
+    )()
+
+    context.user_data["notification_id"] = notification.id
+
+    await update.message.reply_text(
+        "Please enter the time to send the notification (e.g., '2025-04-20 15:30')."
+        f"⏳ Now: {timezone.now()}"
+    )
+    return raya.states.RECEIVE_SCHEDULE_TIME
+
+
+async def receive_schedule_time(update: Update, context: CallbackContext):
+    try:
+        scheduled_time = parse(update.message.text)
+        if scheduled_time < timezone.now():
+            await update.message.reply_text(
+                "❗ You cannot schedule a notification in the past."
+            )
+            return raya.states.RECEIVE_SCHEDULE_TIME
+
+        context.user_data["scheduled_time"] = scheduled_time
+
+        await update.message.reply_text(
+            f"Notification scheduled for {scheduled_time.strftime('%Y-%m-%d %H:%M:%S')}. Do you confirm?",
+            reply_markup=InlineKeyboardMarkup(
+                [
+                    [
+                        InlineKeyboardButton(
+                            "✅ Confirm", callback_data="confirm_schedule"
+                        ),
+                        InlineKeyboardButton(
+                            "❌ Cancel", callback_data="cancel_schedule"
+                        ),
+                    ]
+                ]
+            ),
+        )
+        return raya.states.CONFIRM_SCHEDULE
+    except Exception as e:
+        await update.message.reply_text("❗ Invalid time format. Please try again.")
+        return raya.states.RECEIVE_SCHEDULE_TIME
+
+
+async def confirm_schedule(update: Update, context: CallbackContext):
+    notification_id = context.user_data["notification_id"]
+    scheduled_time = context.user_data["scheduled_time"]
+
+    raya.tasks.send_notification_task.apply_async(
+        args=[notification_id], eta=scheduled_time
+    )
+
+    await update.message.reply_text(f"✅ Notification scheduled for {scheduled_time}.")
+    return ConversationHandler.END
+
+
 async def cancel(update: Update, context: CallbackContext):
     await update.message.reply_text(persian.CANCEL_CONVERSATION)
     return ConversationHandler.END
+
+
+async def check_private_and_manager(update: Update, context: CallbackContext):
+    chat = update.effective_chat
+    user = update.effective_user
+
+    if chat.type.upper() != "PRIVATE":
+        await update.message.reply_text("⚠️ Please use this command in a private chat.")
+        return ConversationHandler.END
+
+    telegram_user = await db_sync_services.get_telegram_user_by_id(user.id)
+
+    if (
+        telegram_user is None
+        or not telegram_user.is_authorized
+        or telegram_user.user_type != TelegramUser.MANAGER_USER
+    ):
+        await update.message.reply_text(
+            "🚫 You are not authorized to perform this action."
+        )
+        return ConversationHandler.END
+
+    context.user_data["telegram_user"] = telegram_user
+    return None

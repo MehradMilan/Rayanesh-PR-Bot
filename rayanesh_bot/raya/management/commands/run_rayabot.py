@@ -28,6 +28,10 @@ from raya.handlers import (
     remove_user_start,
     remove_select_group,
     remove_user,
+    confirm_schedule,
+    receive_schedule_time,
+    send_notification_start,
+    receive_notification_message,
     cancel,
 )
 import raya.commands
@@ -51,6 +55,7 @@ class Command(BaseCommand):
                     "Revoke a document's access from a group.",
                 ),
                 (raya.commands.REMOVE_USER_COMMAND, "Remove a user from a group."),
+                (raya.commands.SEND_NOTIFICATION, "Send notification to users"),
                 (raya.commands.CANCEL_COMMAND, "Cancel a command"),
             ]
         )
@@ -136,5 +141,31 @@ class Command(BaseCommand):
             fallbacks=[CommandHandler(raya.commands.CANCEL_COMMAND, cancel)],
         )
         application.add_handler(remove_user_conv_handler)
+
+        send_notification_handler = ConversationHandler(
+            entry_points=[
+                CommandHandler(raya.commands.SEND_NOTIFICATION, send_notification_start)
+            ],
+            states={
+                raya.states.SELECT_GROUP: [CallbackQueryHandler(select_group)],
+                raya.states.RECEIVE_NOTIFICATION_MESSAGE: [
+                    MessageHandler(
+                        filters.TEXT | filters.PHOTO | filters.VIDEO,
+                        receive_notification_message,
+                    )
+                ],
+                raya.states.RECEIVE_SCHEDULE_TIME: [
+                    MessageHandler(filters.TEXT, receive_schedule_time)
+                ],
+                raya.states.CONFIRM_SCHEDULE: [
+                    CallbackQueryHandler(
+                        confirm_schedule, pattern=r"^confirm_schedule$"
+                    ),
+                    CallbackQueryHandler(cancel, pattern=r"^cancel_schedule$"),
+                ],
+            },
+            fallbacks=[CommandHandler(raya.commands.CANCEL_COMMAND, cancel)],
+        )
+        application.add_handler(send_notification_handler)
 
         application.run_polling(allowed_updates=Update.ALL_TYPES)

@@ -17,3 +17,4 @@ def debug_task(self):
 DB_POSTGRES_BACKUP_QUEUE = "db_postgres_backup"
 REMIND_TASKS_IN_GROUPS_QUEUE = "remind_tasks_in_groups"
 GATEKEEPERS_QUEUE = "gatekeepers"
+NOTIFICATION_QUEUE = "notification"
