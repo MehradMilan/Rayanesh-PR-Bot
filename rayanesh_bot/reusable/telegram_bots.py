@@ -30,3 +30,18 @@ def send_document_sync(bot: Bot, chat_id: str | int, file_path: str, filename: s
         data = {"chat_id": chat_id}
         response = requests.post(url, data=data, files=files)
         response.raise_for_status()
+
+
+def send_message_sync(bot: Bot, chat_id: str | int, message: str):
+    path = "sendMessage"
+    url = _TELEGRAM_API_URL.format(bot.token, path)
+
+    data = {
+        "chat_id": chat_id,
+        "text": message,
+        "parse_mode": "Markdown",
+    }
+
+    response = requests.post(url, data=data)
+    response.raise_for_status()
+    return response.json()

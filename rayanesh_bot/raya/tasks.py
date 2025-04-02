@@ -1,21 +1,32 @@
 import typing
-from datetime import datetime
 import os
 import subprocess
 from pathlib import Path
 from asgiref.sync import sync_to_async
+import pytz
+from telegram.error import TelegramError
+import asyncio
+import time
 
 from django.conf import settings
 import celery
 from celery.schedules import crontab
 from celery.utils.log import get_task_logger
-from core.celery import DB_POSTGRES_BACKUP_QUEUE, app as celery_app
+from django.utils import timezone
+from core.celery import (
+    DB_POSTGRES_BACKUP_QUEUE,
+    GATEKEEPERS_QUEUE,
+    NOTIFICATION_QUEUE,
+    app as celery_app,
+)
 
 import reusable.db_sync_services as db_sync_services
-from user.models import TelegramUser, Group
-from document.models import Document, DocumentGroupAccess
+from user.models import TelegramUser, Group, GroupMembership
+from document.models import Document, DocumentGroupAccess, DocumentUserAccess
 import raya.services
 import reusable.telegram_bots
+import raya.models
+import reusable.persian_response as persian
 
 logger = get_task_logger(__name__)
 
@@ -27,6 +38,12 @@ def setup_periodic_tasks(sender: celery.Celery, **_) -> None:
         backup_postgres_database.s(),
         name="backup_postgres_database",
         queue=DB_POSTGRES_BACKUP_QUEUE,
+    )
+    sender.add_periodic_task(
+        crontab(minute=1, hour="*"),
+        check_gate_status.s(),
+        name="check_gate_status",
+        queue=GATEKEEPERS_QUEUE,
     )
 
 
@@ -76,7 +93,9 @@ async def update_user_access_joined_group(
     )()
 
     for group_access in group_doc_accesses:
-        document: Document = group_access.document
+        document: Document = (
+            await db_sync_services.get_document_from_document_group_access(group_access)
+        )
         access_level: str = group_access.access_level
 
         try:
@@ -89,7 +108,7 @@ async def update_user_access_joined_group(
             if created:
                 logger.info(f"Creating new access: {document.google_id} → {user.email}")
 
-                is_ok, error = await raya.services.give_document_access_to_user(
+                is_ok, error = raya.services.give_document_access_to_user(
                     document_id=document.google_id,
                     user_email=user.email,
                     access_level=access_level,
@@ -112,13 +131,105 @@ async def update_user_access_joined_group(
     return (not failed_docs, failed_docs)
 
 
+async def revoke_access_from_group(
+    group: Group, document_id: str
+) -> typing.Tuple[bool, typing.Dict[str, str]]:
+    """
+    Revoke access to a document from all users in the specified group.
+    Removes the group access, reduces user access count, and revokes access on Google.
+    """
+    group_doc_accesses = await sync_to_async(
+        lambda: list(
+            DocumentGroupAccess.objects.filter(
+                group=group, document__google_id=document_id
+            )
+        )
+    )()
+
+    if not group_doc_accesses:
+        return False, {
+            "document": "Access record not found for this group and document."
+        }
+
+    for group_access in group_doc_accesses:
+        await sync_to_async(group_access.delete)()
+
+    failed_users = {}
+    group_members = await db_sync_services.get_group_members(group)
+
+    for user in group_members:
+        try:
+            user_access = await sync_to_async(
+                lambda: DocumentUserAccess.objects.filter(
+                    document__google_id=document_id, user=user
+                )
+            )()
+
+            if user_access:
+                user_access.access_count -= 1
+
+                if user_access.access_count <= 0:
+                    is_ok, error = raya.services.revoke_document_access_from_user(
+                        document_id=document_id,
+                        user_email=user.email,
+                    )
+
+                    if not is_ok:
+                        failed_users[user.email] = error
+                        continue
+
+                    await sync_to_async(user_access.delete)()
+
+                else:
+                    await sync_to_async(user_access.save)()
+
+        except Exception as e:
+            failed_users[user.email] = str(e)
+
+    return (not failed_users, failed_users)
+
+
+async def remove_user_from_group(
+    user: TelegramUser, group: Group
+) -> typing.Tuple[bool, typing.Dict[str, str]]:
+    membership: GroupMembership = await sync_to_async(
+        lambda: GroupMembership.objects.filter(group=group, user=user).first()
+    )()
+    await sync_to_async(membership.delete)()
+
+    group_doc_accesses = await sync_to_async(
+        lambda: list(
+            DocumentGroupAccess.objects.filter(group=group)
+            .select_related("document")
+            .prefetch_related("document__documentuseraccess_set__user")
+        )
+    )()
+    failed_docs = {}
+    for doc_access in group_doc_accesses:
+        document = doc_access.document
+        for user_access in doc_access.document.documentuseraccess_set.all():
+            user_access.access_count -= 1
+            if user_access.access_count <= 0:
+                is_ok, error = raya.services.revoke_document_access_from_user(
+                    document_id=document.google_id,
+                    user_email=user.email,
+                )
+                if not is_ok:
+                    failed_docs[document.google_id] = error
+                    continue
+                await sync_to_async(user_access.delete)()
+            else:
+                await sync_to_async(user_access.save)()
+    return (not failed_docs, failed_docs)
+
+
 @celery.shared_task(name="backup_postgres_database", queue=DB_POSTGRES_BACKUP_QUEUE)
 def backup_postgres_database():
     """
     Performs a PostgreSQL database backup and sends it to a Telegram bot.
     Uses safe subprocess practices and handles errors cleanly.
     """
-    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    timestamp = timezone.now().strftime("%Y-%m-%d_%H-%M-%S")
     backup_filename = f"db_backup_{timestamp}.sql"
     backup_dir = Path(settings.BACKUP_DIR)
     backup_dir.mkdir(parents=True, exist_ok=True)
@@ -163,3 +274,101 @@ def backup_postgres_database():
         if backup_path.exists():
             backup_path.unlink()
             logger.info(f"Temporary backup file deleted: {backup_path}")
+
+
+@celery.shared_task(name="check_gate_status", queue=GATEKEEPERS_QUEUE)
+def check_gate_status():
+    tehran_tz = pytz.timezone("Asia/Tehran")
+    now = timezone.now().astimezone(tehran_tz)
+    current_time = now.time()
+    weekday = now.weekday()
+
+    if now.hour in range(1, 8):
+        for gate in raya.models.Gate.objects.filter(scannable=True).exclude(
+            gate_keepers_group__is_null=True
+        ):
+            if weekday in [3, 4]:  # Thursday (3), Friday (4)
+                gate.is_active = False
+                logger.info(f"Changed gate {gate} is_active status to False.")
+            else:
+                gate.is_active = True
+                logger.info(f"Changed gate {gate} is_active status to True.")
+            gate.save()
+
+    telegram_bot = reusable.telegram_bots.get_telegram_bot()
+    for gate in raya.models.Gate.objects.filter(scannable=True, is_active=True):
+        if (
+            not gate.is_open
+            and gate.open_from
+            and gate.open_to
+            and gate.open_from <= current_time <= gate.open_to
+        ):
+            reusable.telegram_bots.send_message_sync(
+                bot=telegram_bot,
+                chat_id=gate.gate_keepers_group.chat_id,
+                message=persian.OPEN_GATE_MESSAGES.get(
+                    now.hour, persian.OPEN_GATE_MESSAGE_DEF
+                ).format(id=gate.id),
+            )
+            logger.info(
+                f"Reminded to open the door in Gatekeepers at {now.hour} O'clock."
+            )
+        elif (
+            gate.is_open
+            and gate.close_from
+            and gate.close_to
+            and gate.close_from <= current_time <= gate.close_to
+        ):
+            reusable.telegram_bots.send_message_sync(
+                bot=telegram_bot,
+                chat_id=gate.gate_keepers_group.chat_id,
+                message=persian.CLOSE_GATE_MESSAGES.get(
+                    now.hour, persian.CLOSE_GATE_MESSAGE_DEF
+                ).format(id=gate.id),
+            )
+            logger.info(
+                f"Reminded to close the door in Gatekeepers at {now.hour} O'clock."
+            )
+
+
+@celery.shared_task(name="send_notification_task", queue=NOTIFICATION_QUEUE)
+def send_notification_task(notification_id):
+    notification = raya.models.Notification.objects.get(id=notification_id)
+
+    if notification.is_general:
+        target_ids = TelegramUser.objects.all().values_list("telegram_id", flat=True)
+    else:
+        if notification.group:
+            target_ids = (
+                TelegramUser.objects.filter(
+                    groupmembership__group=notification.group,
+                    groupmembership__is_approved=True,
+                )
+                .distinct()
+                .values_list("telegram_id", flat=True)
+            )
+        else:
+            target_ids = []
+
+    tbot = reusable.telegram_bots.get_telegram_bot()
+    for user_id in target_ids:
+        try:
+            asyncio.run(forward_notification_message(tbot, notification, user_id))
+            time.sleep(0.5)
+        except Exception as e:
+            logger.error(f"Sending notification to user {user_id} failed: {e}")
+            continue
+
+    notification.propagated_at = timezone.now()
+    notification.save()
+
+
+async def forward_notification_message(bot, notification, user_id):
+    try:
+        await bot.copy_message(
+            chat_id=user_id,
+            from_chat_id=notification.source_channel_id,
+            message_id=notification.message_id,
+        )
+    except TelegramError as e:
+        logger.error(f"Failed to send notification to {user_id}: {e}")

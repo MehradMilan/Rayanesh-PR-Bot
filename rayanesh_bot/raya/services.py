@@ -65,3 +65,25 @@ def give_document_access_to_user(
         return False, str(e)
 
     return True, None
+
+
+def revoke_document_access_from_user(
+    document_id: str, user_email: str
+) -> typing.Tuple[bool, str | None]:
+    try:
+        permissions = (
+            get_drive_service().permissions().list(fileId=document_id).execute()
+        )
+        for permission in permissions.get("permissions", []):
+            if permission.get("emailAddress") == user_email:
+                get_drive_service().permissions().delete(
+                    fileId=document_id, permissionId=permission["id"]
+                ).execute()
+                return True, None
+        return False, "No permission found for user."
+    except HttpError as e:
+        logger.error(e)
+        return False, str(e)
+    except Exception as e:
+        logger.error(e)
+        return False, str(e)

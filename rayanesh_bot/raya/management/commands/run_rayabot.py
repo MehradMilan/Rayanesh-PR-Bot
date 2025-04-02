@@ -22,6 +22,17 @@ from raya.handlers import (
     select_group,
     enter_doc_link,
     confirm_doc,
+    revoke_access_start,
+    revoke_process_link,
+    revoke_select_group,
+    remove_user_start,
+    remove_select_group,
+    remove_user,
+    confirm_schedule,
+    receive_schedule_time,
+    send_notification_start,
+    receive_notification_message,
+    cancel_schedule,
     cancel,
 )
 import raya.commands
@@ -34,9 +45,19 @@ class Command(BaseCommand):
     async def post_init(self, application):
         await application.bot.set_my_commands(
             [
-                ("accept_join", "Accept New Joiners"),
-                ("list_groups", "List all active groups"),
-                ("give_access", "Give a document's access to a group."),
+                (raya.commands.ACCEPT_JOIN_GROUP_COMMAND, "Accept New Joiners"),
+                (raya.commands.LIST_GROUPS_COMMAND, "List all active groups"),
+                (
+                    raya.commands.GIVE_ACCESS_COMMAND,
+                    "Give a document's access to a group.",
+                ),
+                (
+                    raya.commands.REVOKE_ACCESS_COMMAND,
+                    "Revoke a document's access from a group.",
+                ),
+                (raya.commands.REMOVE_USER_COMMAND, "Remove a user from a group."),
+                (raya.commands.SEND_NOTIFICATION, "Send notification to users"),
+                (raya.commands.CANCEL_COMMAND, "Cancel a command"),
             ]
         )
 
@@ -89,5 +110,63 @@ class Command(BaseCommand):
             fallbacks=[CommandHandler(raya.commands.CANCEL_COMMAND, cancel)],
         )
         application.add_handler(give_access_conv_handler)
+
+        revoke_access_conv_handler = ConversationHandler(
+            entry_points=[
+                CommandHandler(raya.commands.REVOKE_ACCESS_COMMAND, revoke_access_start)
+            ],
+            states={
+                raya.states.SELECT_GROUP: [
+                    MessageHandler(filters.Regex(r"^/group_\d+"), revoke_select_group)
+                ],
+                raya.states.ENTER_DOC_LINK: [
+                    MessageHandler(filters.TEXT & ~filters.COMMAND, revoke_process_link)
+                ],
+            },
+            fallbacks=[CommandHandler(raya.commands.CANCEL_COMMAND, cancel)],
+        )
+        application.add_handler(revoke_access_conv_handler)
+
+        remove_user_conv_handler = ConversationHandler(
+            entry_points=[
+                CommandHandler(raya.commands.REMOVE_USER_COMMAND, remove_user_start)
+            ],
+            states={
+                raya.states.SELECT_GROUP: [
+                    MessageHandler(filters.Regex(r"^/group_\d+"), remove_select_group)
+                ],
+                raya.states.SELECT_USER: [
+                    MessageHandler(filters.Regex(r"^/remove_user_\d+"), remove_user)
+                ],
+            },
+            fallbacks=[CommandHandler(raya.commands.CANCEL_COMMAND, cancel)],
+        )
+        application.add_handler(remove_user_conv_handler)
+
+        send_notification_handler = ConversationHandler(
+            entry_points=[
+                CommandHandler(raya.commands.SEND_NOTIFICATION, send_notification_start)
+            ],
+            states={
+                raya.states.SELECT_GROUP: [CallbackQueryHandler(select_group)],
+                raya.states.RECEIVE_NOTIFICATION_MESSAGE: [
+                    MessageHandler(
+                        filters.TEXT | filters.PHOTO | filters.VIDEO,
+                        receive_notification_message,
+                    )
+                ],
+                raya.states.RECEIVE_SCHEDULE_TIME: [
+                    MessageHandler(filters.TEXT, receive_schedule_time)
+                ],
+                raya.states.CONFIRM_SCHEDULE: [
+                    CallbackQueryHandler(
+                        confirm_schedule, pattern=r"^confirm_schedule$"
+                    ),
+                    CallbackQueryHandler(cancel_schedule, pattern=r"^cancel_schedule$"),
+                ],
+            },
+            fallbacks=[CommandHandler(raya.commands.CANCEL_COMMAND, cancel)],
+        )
+        application.add_handler(send_notification_handler)
 
         application.run_polling(allowed_updates=Update.ALL_TYPES)

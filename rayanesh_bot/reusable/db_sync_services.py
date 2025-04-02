@@ -2,8 +2,10 @@ from asgiref.sync import sync_to_async
 import typing
 from telegram import User
 
-from user.models import TelegramUser, Group, GroupMembership
+from user.models import TelegramUser, Group, GroupMembership, Task
 from document.models import Document, DocumentGroupAccess, DocumentUserAccess
+from raya.models import Gate
+from music.models import Playlist
 
 
 @sync_to_async
@@ -83,6 +85,15 @@ def get_group_members(group: Group) -> list[TelegramUser]:
 
 
 @sync_to_async
+def get_user_groups(user):
+    return list(
+        Group.objects.filter(
+            groupmembership__user=user, groupmembership__is_approved=True
+        ).distinct()
+    )
+
+
+@sync_to_async
 def get_group_members_count(group: Group) -> int:
     return TelegramUser.objects.filter(
         groupmembership__group=group, groupmembership__is_approved=True
@@ -130,3 +141,71 @@ def get_or_create_document_user_access(
     return DocumentUserAccess.objects.get_or_create(
         document=document, user=user, defaults={"access_level": access_level}
     )
+
+
+@sync_to_async
+def get_task_by_id(task_id: str) -> Task:
+    return Task.objects.filter(id=task_id).first()
+
+
+@sync_to_async
+def assigne_user_to_task(user: TelegramUser, task: Task) -> None:
+    task.state = task.TAKEN_STATE
+    task.assignee_user = user
+    task.save()
+    return
+
+
+@sync_to_async
+def get_task_assignee(task: Task) -> TelegramUser | None:
+    return task.assignee_user
+
+
+@sync_to_async
+def mark_task_as_done(task: Task) -> None:
+    task.state = Task.DONE_STATE
+    task.save()
+    return
+
+
+@sync_to_async
+def get_document_from_document_user_access(dua: DocumentUserAccess) -> Document:
+    return dua.document
+
+
+@sync_to_async
+def get_document_from_document_group_access(dga: DocumentGroupAccess) -> Document:
+    return dga.document
+
+
+@sync_to_async
+def close_gate(gate: Gate) -> None:
+    gate.is_open = False
+    gate.save()
+    return
+
+
+@sync_to_async
+def open_gate(gate: Gate) -> None:
+    gate.is_open = True
+    gate.save()
+    return
+
+
+@sync_to_async
+def deactivate_gate(gate: Gate) -> None:
+    gate.is_active = False
+    gate.save()
+    return
+
+
+@sync_to_async
+def activate_gate(gate: Gate) -> None:
+    gate.is_active = True
+    gate.save()
+    return
+
+
+@sync_to_async
+def get_playlist_owner(playlist: Playlist) -> TelegramUser:
+    return playlist.owner

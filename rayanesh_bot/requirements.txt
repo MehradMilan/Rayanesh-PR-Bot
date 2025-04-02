@@ -31,6 +31,7 @@ httplib2==0.22.0
 httpx==0.28.1
 idna==3.10
 kombu==5.5.0
+mutagen==1.47.0
 mypy-extensions==1.0.0
 oauthlib==3.2.2
 packaging==24.2
