@@ -459,14 +459,14 @@ async def send_music_start(update: Update, context: CallbackContext):
         )
     )()
     if not playlists:
-        await update.message.reply_text("There are no public playlists available.")
+        await update.message.reply_text(persian.NO_PLAYLIST_EXIST)
         return ConversationHandler.END
 
     keyboard = [
         [InlineKeyboardButton(p.name, callback_data=str(p.id))] for p in playlists
     ]
     await update.message.reply_text(
-        "Choose a playlist to add your music to:",
+        persian.CHOOSE_PLAYLIST_ADD_MUSIC,
         reply_markup=InlineKeyboardMarkup(keyboard),
     )
     return bot.states.CHOOSE_PLAYLIST
@@ -479,7 +479,7 @@ async def choose_playlist(update: Update, context: CallbackContext):
     playlist_id = int(query.data)
     context.user_data["playlist_id"] = playlist_id
 
-    await query.message.reply_text("Send me the music file now as audio.")
+    await query.message.reply_text(persian.SEND_MUSIC_AUDIO_FILE)
     return bot.states.SEND_MUSIC
 
 
@@ -488,7 +488,9 @@ async def receive_music(update: Update, context: CallbackContext):
     audio = message.audio
 
     if not audio:
-        await update.message.reply_text("Please send a music file.")
+        await update.message.reply_text(
+            f"{persian.INVALID_AUDIO_FILE}\n\n{persian.SEND_MUSIC_AUDIO_FILE}"
+        )
         return bot.states.SEND_MUSIC
 
     telegram_file = await context.bot.get_file(audio.file_id)
@@ -498,7 +500,7 @@ async def receive_music(update: Update, context: CallbackContext):
     context.user_data["artist"] = artist
     context.user_data["file_message"] = message
     if title is None:
-        await update.message.reply_text("What name should I give this track?")
+        await update.message.reply_text(persian.ASK_SONG_NAME)
         return bot.states.ENTER_NAME
     context.user_data["song_name"] = title
     return await forward_to_save_music(update=update, context=context)
@@ -519,7 +521,11 @@ async def forward_to_save_music(update: Update, context: CallbackContext):
     song_name = context.user_data["song_name"]
     artist = context.user_data["artist"]
 
-    caption = f"🎵 {song_name}\n💫 Sent by {telegram_user.username or telegram_user.name}\n\n◾ @{settings.RAYANESH_CHANNEL_ID}"
+    caption = persian.MUSIC_CAPTION.format(
+        song_name=song_name,
+        username=(telegram_user.username or telegram_user.name),
+        rayanesh_id=settings.RAYANESH_CHANNEL_ID,
+    )
 
     try:
         forwarded = await context.bot.copy_message(
@@ -555,14 +561,12 @@ async def forward_to_save_music(update: Update, context: CallbackContext):
 
     keyboard = [
         [
-            InlineKeyboardButton("✅ Yes", callback_data="send_to_raya_yes"),
-            InlineKeyboardButton("❌ No", callback_data="send_to_raya_no"),
+            InlineKeyboardButton(persian.YES, callback_data="send_to_raya_yes"),
+            InlineKeyboardButton(persian.NO, callback_data="send_to_raya_no"),
         ]
     ]
     await update.message.reply_text(
-        "✅ Your music has been added to the playlist!\n"
-        "🥷 Original message was deleted for better Experience.\n\n"
-        "Do you want to send this track to رایاموزیک?",
+        persian.SEND_MUSIC_SUCCESS_ASK_SEND_RAYA_MUSIC,
         reply_markup=InlineKeyboardMarkup(keyboard),
     )
     return bot.states.SEND_TO_RAYAMUSIC
@@ -579,12 +583,12 @@ async def handle_send_to_raya(update: Update, context: CallbackContext):
                 from_chat_id=settings.MUSIC_CHANNEL_CHAT_ID,
                 message_id=int(context.user_data["last_forwarded_message_id"]),
             )
-            await query.message.reply_text("🎶 Track sent to رایاموزیک!")
+            await query.message.reply_text(persian.SEND_TO_RAYA_MUSIC_SUCCESS)
         except Exception as e:
             logger.error(f"Failed to forward to RAYAMUSIC channel: {e}")
-            await query.message.reply_text("⚠️ Failed to send to رایاموزیک.")
+            await query.message.reply_text(persian.SEND_TO_RAYA_MUSIC_FAIL)
     else:
-        await query.message.reply_text("👍 Got it, not sending to رایاموزیک.")
+        await query.message.reply_text(persian.NOT_SEND_TO_RAYA_MUSIC)
 
     return ConversationHandler.END
 
@@ -618,18 +622,14 @@ async def listen_music_start(update: Update, context: CallbackContext):
         )
     )()
     if not playlists:
-        await update.message.reply_text("🎧 No accessible playlists available.")
+        await update.message.reply_text(persian.PLAYLIST_NOT_FOUND)
         return ConversationHandler.END
 
-    emoji_map = {
-        "owner": "🧺",
-        "shared": "🤝",
-        "public": "🌍",
-    }
+    emoji_map = persian.PLAYLIST_TYPE_EMOJI_MAP
     keyboard = [
         [
             InlineKeyboardButton(
-                f"{emoji_map.get(p.access_type, '📁')} {p.name}",
+                f"{emoji_map.get(p.access_type, persian.PLAYLIST_DEFAULT_TYPE_EMOJI)} {p.name}",
                 callback_data=str(p.id),
             )
         ]
@@ -637,11 +637,7 @@ async def listen_music_start(update: Update, context: CallbackContext):
     ]
 
     await update.message.reply_text(
-        "📂 *Your Playlists*\n\n"
-        "🧺 Your own playlists\n"
-        "🤝 Shared with you\n"
-        "🌍 Publicly accessible\n\n"
-        "🎼 Select a playlist to listen:",
+        f"{persian.PLAYLIST_TYPES_EXPL}\n{persian.SELECT_PLAYLIST_TO_LISTEN}",
         reply_markup=InlineKeyboardMarkup(keyboard),
         parse_mode="Markdown",
     )
@@ -658,12 +654,12 @@ async def listen_choose_playlist(update: Update, context: CallbackContext):
 
     keyboard = [
         [
-            InlineKeyboardButton("✅ Yes", callback_data="yes"),
-            InlineKeyboardButton("❌ No", callback_data="no"),
+            InlineKeyboardButton(persian.YES, callback_data="yes"),
+            InlineKeyboardButton(persian.NO, callback_data="no"),
         ]
     ]
     await query.message.reply_text(
-        "Do you want to delete previously sent tracks?",
+        persian.ASK_DELETE_PREVIOUS_SONGS,
         reply_markup=InlineKeyboardMarkup(keyboard),
     )
     return bot.states.CONFIRM_DELETE
@@ -752,7 +748,7 @@ async def confirm_delete(update: Update, context: CallbackContext):
         except Exception:
             continue
 
-    await query.message.reply_text("🎶 Your playlist is ready to enjoy!")
+    await query.message.reply_text(persian.LISTEN_MUSIC_SUCCESS)
     return ConversationHandler.END
 
 
@@ -760,13 +756,13 @@ async def create_playlist_start(update: Update, context: CallbackContext):
     check = await check_private_and_authorized(update, context)
     if check is not None:
         return check
-    await update.message.reply_text("📝 Please enter a name for your playlist:")
+    await update.message.reply_text(persian.PLAYLIST_NAME)
     return bot.states.CREATE_PLAYLIST_NAME
 
 
 async def create_playlist_name(update: Update, context: CallbackContext):
     context.user_data["playlist_name"] = update.message.text
-    await update.message.reply_text("💬 Enter a description (or send - to skip):")
+    await update.message.reply_text(persian.PLAYLIST_DESCRIPTIONESCRIPTION)
     return bot.states.CREATE_PLAYLIST_DESCRIPTION
 
 
@@ -774,14 +770,14 @@ async def create_playlist_description(update: Update, context: CallbackContext):
     description = update.message.text
     if description.strip() == "-":
         description = ""
-    elif len(description) > 680:
+    elif len(description) > 400:
         await update.message.reply_text(
-            "⚠️ The description must be under 680 characters.\nPlease try again:"
+            persian.PLAYLIST_DESCRIPTION_MAX_LENGTH.format(400)
         )
         return bot.states.CREATE_PLAYLIST_DESCRIPTION
 
     context.user_data["playlist_description"] = description
-    await update.message.reply_text("🖼️ Now, send a photo to use as the cover image:")
+    await update.message.reply_text(persian.PLAYLIST_SEND_COVER)
     return bot.states.CREATE_PLAYLIST_COVER
 
 
@@ -791,7 +787,7 @@ async def create_playlist_cover(update: Update, context: CallbackContext):
 
     photo = update.message.photo
     if not photo:
-        await update.message.reply_text("❗Please send a photo.")
+        await update.message.reply_text(persian.PLAYLIST_SEND_COVER_INVALID_PHOTO)
         return bot.states.CREATE_PLAYLIST_COVER
 
     sent = await context.bot.copy_message(
@@ -809,7 +805,7 @@ async def create_playlist_cover(update: Update, context: CallbackContext):
     )
 
     await update.message.reply_text(
-        f"✅ Playlist «{playlist.name}» created successfully!"
+        persian.PLAYLIST_CREATE_SUCCESS.format(name=playlist.name)
     )
     return ConversationHandler.END
 
@@ -844,20 +840,16 @@ async def my_playlists(update: Update, context: CallbackContext):
     )()
 
     if not playlists:
-        await update.message.reply_text("You don't have any playlists yet.")
+        await update.message.reply_text(persian.NO_PLAYLIST_EXIST)
         return ConversationHandler.END
 
     context.user_data["my_playlists"] = {str(p.id): p for p in playlists}
 
-    emoji_map = {
-        "owner": "🧺",
-        "shared": "🤝",
-        "public": "🌍",
-    }
+    emoji_map = persian.PLAYLIST_TYPE_EMOJI_MAP
     keyboard = [
         [
             InlineKeyboardButton(
-                f"{emoji_map.get(p.access_type, '📁')} {p.name}",
+                f"{emoji_map.get(p.access_type, persian.PLAYLIST_DEFAULT_TYPE_EMOJI)} {p.name}",
                 callback_data=str(p.id),
             )
         ]
@@ -865,11 +857,7 @@ async def my_playlists(update: Update, context: CallbackContext):
     ]
 
     await update.message.reply_text(
-        "📂 *Your Playlists*\n\n"
-        "🧺 Your own playlists\n"
-        "🤝 Shared with you\n"
-        "🌍 Publicly accessible\n\n"
-        "👇 Select a playlist to see its details:",
+        f"{persian.PLAYLIST_TYPES_EXPL}\n{persian.SELECT_PLAYLIST_TO_SEE_DETAILS}",
         reply_markup=InlineKeyboardMarkup(keyboard),
         parse_mode="Markdown",
     )
@@ -884,7 +872,7 @@ async def show_playlist_details(update: Update, context: CallbackContext):
     playlist = context.user_data["my_playlists"].get(playlist_id)
 
     if not playlist:
-        await query.message.reply_text("⚠️ Playlist not found.")
+        await query.message.reply_text(persian.PLAYLIST_NOT_FOUND)
         return ConversationHandler.END
     owner = await sync_to_async(lambda: playlist.owner)()
     owner_username = owner.username or owner.name or "Unknown"
@@ -900,14 +888,15 @@ async def show_playlist_details(update: Update, context: CallbackContext):
 
     if update.effective_user.id == owner.telegram_id:
         if playlist.is_public:
-            caption += f"\n👀 Change visibility: /private_{playlist.id}"
+            caption += persian.CHANGE_VISIBILITY_COMMAND.format(
+                to_State="private", playlist_id=playlist.id
+            )
         else:
-            caption += f"\n👀 Change visibility: /public_{playlist.id}"
-        caption += (
-            f"\n📝 Edit title: /edit_title_{playlist.id}"
-            f"\n🖼️ Edit cover: /edit_cover_{playlist.id}"
-            f"\n🎶 View all songs: /all_songs_{playlist.id}"
-            f"\n\n📨 Share playlist, 🎧 Listen together: {playlist.share_playlist_uri}"
+            caption += persian.CHANGE_VISIBILITY_COMMAND.format(
+                to_State="public", playlist_id=playlist.id
+            )
+        caption += persian.PLAYLIST_DETAIL_CAPTION.format(
+            playlist_id=playlist.id, share_playlist_uri=playlist.share_playlist_uri
         )
 
     if playlist.cover_message_id:
@@ -940,15 +929,16 @@ async def toggle_playlist_visibility(update: Update, context: CallbackContext):
         lambda: Playlist.objects.filter(id=playlist_id, owner=telegram_user).first()
     )()
     if not playlist:
-        await update.message.reply_text("⚠️ Playlist not found or not owned by you.")
+        await update.message.reply_text(persian.PLAYLIST_NOT_FOUND)
         return
 
     playlist.is_public = True if action == "public" else False
     await sync_to_async(playlist.save)()
 
-    status = "now public ✅" if playlist.is_public else "now private 🔒"
+    status = persian.PUBLIC_SUCCESS if playlist.is_public else persian.PRIVATE_SUCCESS
     await update.message.reply_text(
-        f"Playlist *{playlist.name}* is {status}", parse_mode="Markdown"
+        persian.CHANGE_VISIBILITY_SUCCESS.format(name=playlist.name, status=status),
+        parse_mode="Markdown",
     )
 
 
@@ -957,12 +947,12 @@ async def check_private_and_authorized(update: Update, context: CallbackContext)
     user = update.effective_user
 
     if chat.type.upper() != "PRIVATE":
-        await update.message.reply_text("⚠️ Please use this command in a private chat.")
+        await update.message.reply_text(persian.USE_IN_PRIVATE_CHAT)
         return ConversationHandler.END
 
     telegram_user = await db_sync_services.get_telegram_user_by_id(telegram_id=user.id)
     if telegram_user is None or not telegram_user.is_authorized:
-        await update.message.reply_text("🚫 You are not authorized yet. Use /authorize")
+        await update.message.reply_text(persian.USER_UNAUTHORIZED)
         return ConversationHandler.END
 
     context.user_data["telegram_user"] = telegram_user
@@ -979,7 +969,7 @@ async def edit_title(update: Update, context: CallbackContext):
 
     match = re.match(r"/edit_title_(\d+)(?:@\w+)?", text)
     if not match:
-        await update.message.reply_text("❌ Invalid command format.")
+        await update.message.reply_text(persian.INVALID_COMMAND)
         return ConversationHandler.END
 
     playlist_id = int(match.group(1))
@@ -987,11 +977,11 @@ async def edit_title(update: Update, context: CallbackContext):
         lambda: Playlist.objects.filter(id=playlist_id, owner=telegram_user).first()
     )()
     if not playlist:
-        await update.message.reply_text("⚠️ Playlist not found or not owned by you.")
+        await update.message.reply_text(persian.PLAYLIST_NOT_FOUND)
         return ConversationHandler.END
 
     context.user_data["playlist_to_edit"] = playlist
-    await update.message.reply_text("📝 Send the new title for your playlist:")
+    await update.message.reply_text(persian.SEND_PLAYLIST_TITLE)
     return bot.states.EDIT_TITLE
 
 
@@ -1003,7 +993,10 @@ async def receive_new_title(update: Update, context: CallbackContext):
     await sync_to_async(playlist.save)()
 
     await update.message.reply_text(
-        f"✅ Playlist title updated to: *{new_title}*", parse_mode="Markdown"
+        persian.PLAYLIST_TITLE_UPDATE_SUCCESS.format(new_title=new_title)
+        .replace("_", "\_")
+        .replace("-", "\-"),
+        parse_mode="Markdown",
     )
     return ConversationHandler.END
 
@@ -1018,7 +1011,7 @@ async def edit_cover(update: Update, context: CallbackContext):
 
     match = re.match(r"/edit_cover_(\d+)(?:@\w+)?", text)
     if not match:
-        await update.message.reply_text("❌ Invalid command format.")
+        await update.message.reply_text(persian.INVALID_COMMAND)
         return ConversationHandler.END
 
     playlist_id = int(match.group(1))
@@ -1026,11 +1019,11 @@ async def edit_cover(update: Update, context: CallbackContext):
         lambda: Playlist.objects.filter(id=playlist_id, owner=telegram_user).first()
     )()
     if not playlist:
-        await update.message.reply_text("⚠️ Playlist not found or not owned by you.")
+        await update.message.reply_text(persian.PLAYLIST_NOT_FOUND)
         return ConversationHandler.END
 
     context.user_data["playlist_to_edit"] = playlist
-    await update.message.reply_text("🖼️ Send a new photo to use as the cover:")
+    await update.message.reply_text(persian.PLAYLIST_SEND_NEW_COVER)
     return bot.states.EDIT_COVER
 
 
@@ -1039,7 +1032,7 @@ async def receive_new_cover(update: Update, context: CallbackContext):
     new_photo = update.message.photo
 
     if not new_photo:
-        await update.message.reply_text("❗Please send a valid photo.")
+        await update.message.reply_text(persian.PLAYLIST_SEND_COVER_INVALID_PHOTO)
         return bot.states.EDIT_COVER
 
     if playlist.cover_message_id:
@@ -1060,7 +1053,7 @@ async def receive_new_cover(update: Update, context: CallbackContext):
     playlist.cover_message_id = str(sent.message_id)
     await sync_to_async(playlist.save)()
 
-    await update.message.reply_text("✅ Playlist cover updated successfully.")
+    await update.message.reply_text(persian.PLAYLIST_COVER_UPDATE_SUCCESS)
     return ConversationHandler.END
 
 
@@ -1074,7 +1067,7 @@ async def all_songs(update: Update, context: CallbackContext):
 
     match = re.match(r"/all_songs_(\d+)", text)
     if not match:
-        await update.message.reply_text("❌ Invalid command format.")
+        await update.message.reply_text(persian.INVALID_COMMAND)
         return
 
     playlist_id = int(match.group(1))
@@ -1083,13 +1076,13 @@ async def all_songs(update: Update, context: CallbackContext):
     )()
 
     if not playlist:
-        await update.message.reply_text("⚠️ Playlist not found or not owned by you.")
+        await update.message.reply_text(persian.PLAYLIST_NOT_FOUND)
         return
 
     songs = await sync_to_async(lambda: list(playlist.songs.all()))()
 
     if not songs:
-        await update.message.reply_text("There are no songs in this playlist.")
+        await update.message.reply_text(persian.EMPTY_PLAYLIST)
         return
 
     song_list = "\n".join(
@@ -1100,7 +1093,7 @@ async def all_songs(update: Update, context: CallbackContext):
     )
 
     await update.message.reply_text(
-        f'🎶 Song List for Playlist "{playlist.name}":\n{song_list}',
+        persian.SONGS_LIST_PLAYLIST.format(name=playlist.name, song_list=song_list)
     )
     return
 
@@ -1115,22 +1108,20 @@ async def remove_song(update: Update, context: CallbackContext):
 
     match = re.match(r"/remove_(\d+)(?:@\w+)?", text)
     if not match:
-        await update.message.reply_text("❌ Invalid command format.")
+        await update.message.reply_text(persian.INVALID_COMMAND)
         return
 
     song_id = int(match.group(1))
     song: Song = await sync_to_async(lambda: Song.objects.filter(id=song_id).first())()
 
     if not song:
-        await update.message.reply_text("⚠️ Song not found.")
+        await update.message.reply_text(persian.SONG_NOT_FOUND)
         return
 
     playlist = await sync_to_async(lambda: song.playlists.first())()
     owner = await sync_to_async(lambda: playlist.owner)()
     if owner != telegram_user:
-        await update.message.reply_text(
-            "❌ You don't have permission to remove this song."
-        )
+        await update.message.reply_text(persian.INVALID_ACCESS_TO_PLAYLIST)
         return
 
     await sync_to_async(lambda: playlist.songs.remove(song))()
@@ -1144,7 +1135,7 @@ async def remove_song(update: Update, context: CallbackContext):
     except Exception as e:
         logger.error(f"Failed to delete message from channel: {e}")
 
-    await update.message.reply_text(f"✅ Song *{song.name}* has been removed.")
+    await update.message.reply_text(persian.SONG_REMOVE_SUCCESS.format(name=song.name))
 
 
 async def batch_send_music_start(update: Update, context: CallbackContext):
@@ -1161,14 +1152,14 @@ async def batch_send_music_start(update: Update, context: CallbackContext):
         )
     )()
     if not playlists:
-        await update.message.reply_text("There are no playlists available.")
+        await update.message.reply_text(persian.PLAYLIST_NOT_FOUND)
         return ConversationHandler.END
 
     keyboard = [
         [InlineKeyboardButton(p.name, callback_data=str(p.id))] for p in playlists
     ]
     await update.message.reply_text(
-        "Choose a playlist to add your music to:",
+        persian.CHOOSE_PLAYLIST_ADD_MUSIC,
         reply_markup=InlineKeyboardMarkup(keyboard),
     )
     return bot.states.BATCH_CHOOSE_PLAYLIST
@@ -1181,9 +1172,7 @@ async def choose_batch_playlist(update: Update, context: CallbackContext):
     playlist_id = int(query.data)
     context.user_data["batch_playlist_id"] = playlist_id
 
-    await query.message.reply_text(
-        "You can now send multiple music files. Type /done_batch_forward when done."
-    )
+    await query.message.reply_text(persian.BATCH_SEND_MUSIC_EXPL)
     context.user_data["batch_files"] = []
 
     return bot.states.BATCH_RECEIVE_MUSIC
@@ -1194,7 +1183,7 @@ async def receive_batch_music(update: Update, context: CallbackContext):
     audio = message.audio
 
     if not audio:
-        await update.message.reply_text("❗ Please send a valid music file.")
+        await update.message.reply_text(persian.INVALID_AUDIO_FILE)
         return bot.states.BATCH_RECEIVE_MUSIC
 
     context.user_data["batch_files"].append(message)
@@ -1210,7 +1199,7 @@ async def done_batch_forward(update: Update, context: CallbackContext):
 
     playlist_id = context.user_data["batch_playlist_id"]
     if playlist_id is None:
-        update.message.reply_text("❗ No Playlist is selected!")
+        update.message.reply_text(persian.PLAYLIST_NOT_SELECTED)
         return ConversationHandler.END
     playlist = await sync_to_async(lambda: Playlist.objects.get(id=playlist_id))()
 
@@ -1227,7 +1216,11 @@ async def done_batch_forward(update: Update, context: CallbackContext):
                 failed_files.append(file_message)
                 continue
 
-            caption = f"🎵 {song_name}\n💫 Added by {telegram_user.username or telegram_user.name}"
+            caption = persian.MUSIC_CAPTION.format(
+                song_name=song_name,
+                username=(telegram_user.username or telegram_user.name),
+                rayanesh_id=settings.RAYANESH_CHANNEL_ID,
+            )
 
             forwarded = await context.bot.copy_message(
                 chat_id=settings.MUSIC_CHANNEL_CHAT_ID,
@@ -1262,12 +1255,10 @@ async def done_batch_forward(update: Update, context: CallbackContext):
     if failed_files:
         failed_count = len(failed_files)
         await update.message.reply_text(
-            f"❌ {failed_count} song(s) failed to add. Try sending those individually."
+            persian.BATCH_SEND_MUSIC_FAIL.format(failed_count=failed_count)
         )
     else:
-        await update.message.reply_text(
-            "✅ All songs were successfully added to the playlist!"
-        )
+        await update.message.reply_text(persian.BATCH_SEND_MUSIC_SUCCESS)
 
     context.user_data["batch_files"] = []
     context.user_data["batch_playlist_id"] = None

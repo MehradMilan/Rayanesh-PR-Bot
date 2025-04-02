@@ -318,4 +318,197 @@ PLAYLIST_COVER_CAPTION = """
 📅 Playlist on the air from: {created_at}
 ---
 {description}
+
+"""
+
+USE_IN_PRIVATE_CHAT = """
+⚠️ Please use this command in a private chat.
+"""
+
+PLAYLIST_NOT_FOUND = """
+⚠️ Playlist not found or not owned by you.
+"""
+
+SEND_PLAYLIST_TITLE = """
+📝 Send the new title for your playlist:
+"""
+
+PLAYLIST_TITLE_UPDATE_SUCCESS = """
+✅ Playlist title updated to: *{new_title}*
+"""
+
+PLAYLIST_SEND_NEW_COVER = """
+🖼️ Send a new photo to use as the cover:
+"""
+
+PLAYLIST_SEND_COVER_INVALID_PHOTO = """
+❗Please send a valid photo.
+"""
+
+PLAYLIST_COVER_UPDATE_SUCCESS = """
+✅ Playlist cover updated successfully.
+"""
+
+EMPTY_PLAYLIST = """
+There are no songs in this playlist.
+"""
+
+SONGS_LIST_PLAYLIST = """
+🎶 Song List for Playlist {name}:\n{song_list}
+"""
+
+SONG_NOT_FOUND = """
+⚠️ Song not found.
+"""
+
+INVALID_ACCESS_TO_PLAYLIST = """
+❌ You don't have permission to modify this playlist.
+"""
+
+SONG_REMOVE_SUCCESS = """
+✅ Song {name} has been removed.
+"""
+
+CHOOSE_PLAYLIST_ADD_MUSIC = """
+Choose a playlist to add your music to:
+"""
+
+BATCH_SEND_MUSIC_EXPL = """
+You can now send multiple music files. Type /done_batch_forward when done.
+"""
+
+INVALID_AUDIO_FILE = """
+❗ Please send a valid music file.
+"""
+
+PLAYLIST_NOT_SELECTED = """
+❗ No Playlist is selected!
+"""
+
+MUSIC_CAPTION = """
+🎵 {song_name}\n💫 Added by {username}\n\n◾ @{rayanesh_id}
+"""  # In English
+
+BATCH_SEND_MUSIC_FAIL = """
+❌ {failed_count} song(s) failed to add. Try sending those individually.
+"""
+
+BATCH_SEND_MUSIC_SUCCESS = """
+✅ All songs were successfully added to the playlist!
+"""
+
+NO_PLAYLIST_EXIST = """
+There are no public playlists available.
+"""
+
+SEND_MUSIC_AUDIO_FILE = """
+Send me the music file now as audio.
+"""
+
+ASK_SONG_NAME = """
+What name should I give this track?
+"""
+
+YES = """
+✅ Yes
+"""
+
+NO = """
+❌ No
+"""
+
+SEND_MUSIC_SUCCESS_ASK_SEND_RAYA_MUSIC = """
+✅ Your music has been added to the playlist!
+🥷 Original message was deleted for better Experience.
+
+Do you want to send this track to رایاموزیک?
+"""
+
+SEND_TO_RAYA_MUSIC_SUCCESS = """
+🎶 Track sent to رایاموزیک!
+"""
+
+SEND_TO_RAYA_MUSIC_FAIL = """
+⚠️ Failed to send to رایاموزیک.
+"""
+
+NOT_SEND_TO_RAYA_MUSIC = """
+👍 Got it, not sending to رایاموزیک.
+"""
+
+PLAYLIST_TYPE_EMOJI_MAP = {
+    "owner": "🧺",
+    "shared": "🤝",
+    "public": "🌍",
+}  # No change in keys
+
+PLAYLIST_DEFAULT_TYPE_EMOJI = "📁"
+
+PLAYLIST_TYPES_EXPL = """
+📂 *Your Playlists*
+
+🧺 Your own playlists
+🤝 Shared with you
+🌍 Publicly accessible
+"""
+
+SELECT_PLAYLIST_TO_LISTEN = """
+🎼 Select a playlist to listen:
+"""
+
+ASK_DELETE_PREVIOUS_SONGS = """
+Do you want to delete previously sent tracks?
+"""
+
+LISTEN_MUSIC_SUCCESS = """
+🎶 Your playlist is ready to enjoy!
+"""
+
+PLAYLIST_NAME = """
+📝 Please enter a name for your playlist:
+"""
+
+PLAYLIST_DESCRIPTION = """
+💬 Enter a description (or send - to skip):
+"""
+
+PLAYLIST_DESCRIPTION_MAX_LENGTH = """
+⚠️ The description must be under {count} characters.\nPlease try again:
+"""
+
+PLAYLIST_SEND_COVER = """
+🖼️ Now, send a photo to use as the cover image:
+"""
+
+PLAYLIST_CREATE_SUCCESS = """
+✅ Playlist «{name}» created successfully!
+"""
+
+SELECT_PLAYLIST_TO_SEE_DETAILS = """
+👇 Select a playlist to see its details:
+"""
+
+CHANGE_VISIBILITY_COMMAND = """
+👀 Change visibility: /{to_state}_{playlist_id}
+
+"""
+
+PLAYLIST_DETAIL_CAPTION = """
+📝 Edit title: /edit_title_{playlist_id}
+🖼️ Edit cover: /edit_cover_{playlist_id}
+🎶 View all songs: /all_songs_{playlist_id}
+
+📨 Share playlist, 🎧 Listen together: {share_playlist_uri}
+"""
+
+PRIVATE_SUCCESS = """
+now private 🔒
+"""
+
+PUBLIC_SUCCESS = """
+now public ✅
+"""
+
+CHANGE_VISIBILITY_SUCCESS = """
+Playlist *{name}* is {status}
 """
